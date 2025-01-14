@@ -2,14 +2,27 @@ from django.db import models
 from django.utils.timezone import now
 from django.contrib.auth.models import AbstractUser
 
+class Title(models.Model):
+    name = models.CharField(max_length=100, null=True, blank=True, verbose_name="칭호 이름")  # 칭호 이름
+    condition = models.TextField(null=False, verbose_name="칭호 조건")  # 칭호 조건
+    emoji = models.IntegerField(default=0, verbose_name="칭호 이모지")  # 칭호 이모지 ID
+
+    class Meta:
+        db_table = "titles"  # 테이블 이름
+        verbose_name = "칭호"
+        verbose_name_plural = "칭호"
+
+    def __str__(self):
+        return self.name  # 관리자 페이지 등에서 이름으로 표시
+
 class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name="이메일 주소")
     username = models.CharField(max_length=150, unique=True, verbose_name="아이디")
     notif_token = models.TextField(null=True, blank=True, verbose_name="FCM 토큰")
-    password_hash = models.CharField(max_length=128, verbose_name="암호화된 비밀번호")
+    #password_hash = models.CharField(max_length=128, verbose_name="암호화된 비밀번호")
     nickname = models.CharField(max_length=50, verbose_name="닉네임")
-    profile = models.IntegerField(null=True, blank=True, verbose_name="프로필")  # titles 테이블과 연결 가능
-    title = models.CharField(max_length=100, null=True, blank=True, verbose_name="칭호")
+    profile = models.IntegerField(default=0, verbose_name="프로필")
+    title = models.CharField(max_length=100,null=True,blank=True,verbose_name="칭호")
     # 소셜 로그인 제공자 선택 (애플, 카카오, 구글)
     auth_provider = models.CharField(
         max_length=50,
@@ -24,7 +37,7 @@ class User(AbstractUser):
     auth_provider_email = models.EmailField(
         unique=True, null=True, blank=True, verbose_name="소셜 로그인 이메일"
     )
-    required_consent_date = models.DateTimeField(null=True, blank=True, verbose_name="필수 동의 날짜")
+    required_consent = models.BooleanField(default=False, verbose_name="필수 약관 동의 여부")
     push_notification_consent = models.BooleanField(default=False, verbose_name="푸시알림 동의 여부")
     marketing_consent = models.BooleanField(default=False, verbose_name="마케팅 정보 수신 동의 여부")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="계정 생성 날짜")
@@ -35,6 +48,16 @@ class User(AbstractUser):
         verbose_name = "사용자"
         verbose_name_plural = "사용자"
     
+    def save(self, *args, **kwargs):
+        # Title의 첫 번째 레코드를 가져와 기본값으로 설정
+        first_title = Title.objects.first()
+        if first_title:
+            if not self.profile:  # profile이 설정되지 않은 경우
+                self.profile = first_title.emoji  # emoji 값 저장
+            if not self.title:  # title이 설정되지 않은 경우
+                self.title = first_title.name  # name 값 저장
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.username
     
@@ -78,3 +101,28 @@ class UserDeletion(models.Model):
         if self.reason == 7 and self.custom_reason:
             return f"탈퇴 기록: {self.user.username} - 기타 사유: {self.custom_reason}"
         return f"탈퇴 기록: {self.user.username} - {self.get_reason_display()}"
+
+class UserTitle(models.Model):
+    user = models.ForeignKey(
+        User,  # 같은 파일 내 User 모델 직접 참조
+        on_delete=models.CASCADE,
+        related_name="user_titles",  # 역참조 이름
+        verbose_name="유저"
+    )
+    title = models.ForeignKey(
+        Title,
+        on_delete=models.CASCADE,
+        related_name="user_titles",  # 역참조 이름
+        verbose_name="칭호"
+    )
+    is_active = models.BooleanField(default=False, verbose_name="활성화 여부")  # 현재 활성화된 칭호인지
+    acquired_at = models.DateTimeField(default=now, verbose_name="획득 날짜")  # 칭호 획득 날짜
+
+    class Meta:
+        db_table = "user_titles"  # 테이블 이름
+        verbose_name = "유저 획득 칭호"
+        verbose_name_plural = "유저 획득 칭호"
+        unique_together = ("user", "title")  # 동일 유저-칭호 중복 저장 방지
+
+    def __str__(self):
+        return f"{self.user.username} - {self.title.name}"  # 유저와 칭호 이름 표시

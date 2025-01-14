@@ -3,3 +3,5 @@ from .models import *
 # Register your models here.
 admin.site.register(User)
 admin.site.register(UserDeletion)
+admin.site.register(Title)
+admin.site.register(UserTitle)
