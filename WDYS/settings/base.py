@@ -13,6 +13,19 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 
+import os
+import environ
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+env = environ.Env(
+    DEBUG=(bool, True)
+)
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+import pymysql  
+pymysql.install_as_MySQLdb()
+
+
 AUTH_USER_MODEL = 'accounts.User'
 
 SITE_ID = 1
@@ -25,12 +38,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
+# SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
+SECRET_KEY = env.str('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
 
 
 # Application definition
@@ -69,6 +84,7 @@ INSTALLED_APPS = [
     'settings',
     'social',
     'uploads',
+    'comments'
 ]
 
 REST_FRAMEWORK = {
@@ -149,12 +165,12 @@ WSGI_APPLICATION = 'WDYS.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 
 # Password validation
