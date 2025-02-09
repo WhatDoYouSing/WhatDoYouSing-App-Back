@@ -12,7 +12,7 @@ class Emotions(models.Model):
     
 class Times(models.Model):
     id = models.AutoField(primary_key=True)  # 시간 태그 ID
-    name = models.CharField(max_length=50, null=False)  # 시간 태그 이름 (예: "새벽", "아침")
+    name = models.CharField(max_length=50)  # 시간 태그 이름 (예: "새벽", "아침")
     count = models.IntegerField(default=0)  # 각 태그 누적 개수
 
     def __str__(self):
@@ -21,7 +21,7 @@ class Times(models.Model):
 
 class Seasons(models.Model):
     id = models.AutoField(primary_key=True)  # 계절 태그 ID
-    name = models.CharField(max_length=50, null=False)  # 계절 태그 이름 (예: "봄", "여름")
+    name = models.CharField(max_length=50)  # 계절 태그 이름 (예: "봄", "여름")
     count = models.IntegerField(default=0)  # 각 태그 누적 개수
 
     def __str__(self):
@@ -30,7 +30,7 @@ class Seasons(models.Model):
 
 class Contexts(models.Model):
     id = models.AutoField(primary_key=True)  # 일상 맥락 태그 ID
-    name = models.CharField(max_length=50, null=False)  # 일상 맥락 태그 이름 (예: "산책", "여행")
+    name = models.CharField(max_length=50)  # 일상 맥락 태그 이름 (예: "산책", "여행")
     count = models.IntegerField(default=0)  # 각 태그 누적 개수
 
     def __str__(self):
@@ -55,24 +55,24 @@ class Notes(models.Model):
     album_art = models.CharField(max_length=200) # 앨범 아트(유튜브 썸네일 URL)
     song_title = models.CharField(max_length=200) # 노래 제목(유튜브 영상 제목)
     artist = models.CharField(max_length=200) # 아티스트 이름(유튜브 채널명)
-    lyrics = models.TextField(null=True)
+    lyrics = models.TextField(null=True, blank=True)
     link = models.CharField(max_length=200) # 관련 링크(유튜브 URL 등)
     memo = models.TextField() # 노트 내용(메모)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="public")  # 공개 범위
-    location_name = models.CharField(max_length=50, null=True, default="public") #장소명
-    location_address = models.TextField(null=True, default="public") #장소명
+    location_name = models.CharField(max_length=50, null=True, blank=True) #장소명
+    location_address = models.TextField(null=True, blank=True) #장소명
     
     emotion = models.ForeignKey(
-        Emotions, related_name="emotion", on_delete=models.CASCADE
+        Emotions, related_name="emotion", on_delete=models.CASCADE, null=True, blank=True
     )  # 감정
     tag_time = models.ForeignKey(
-        Times, related_name="tag_time", on_delete=models.CASCADE
+        Times, related_name="tag_time", on_delete=models.CASCADE, null=True, blank=True
     )  # 시간 태그
     tag_season =  models.ForeignKey(
-        Seasons, related_name="tag_season", on_delete=models.CASCADE
+        Seasons, related_name="tag_season", on_delete=models.CASCADE, null=True, blank=True
     )  # 계절 태그
     tag_context = models.ForeignKey(
-        Contexts, related_name="tag_context", on_delete=models.CASCADE
+        Contexts, related_name="tag_context", on_delete=models.CASCADE, null=True, blank=True
     )  # 일상맥락 태그
 
     scrap_count = models.IntegerField(default=0)  # 스크랩 수
@@ -102,13 +102,13 @@ class Plis(models.Model):
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="public")  # 공개 범위
 
     tag_time = models.ForeignKey(
-        Times, related_name="pli_tag_time", on_delete=models.CASCADE
+        Times, related_name="pli_tag_time", on_delete=models.CASCADE, null=True, blank=True
     )  # 시간 태그
     tag_season =  models.ForeignKey(
-        Seasons, related_name="pli_tag_season", on_delete=models.CASCADE
+        Seasons, related_name="pli_tag_season", on_delete=models.CASCADE, null=True, blank=True
     )  # 계절 태그
     tag_context = models.ForeignKey(
-        Contexts, related_name="pli_tag_context", on_delete=models.CASCADE
+        Contexts, related_name="pli_tag_context", on_delete=models.CASCADE, null=True, blank=True
     )  # 일상맥락 태그
 
     def __str__(self):
@@ -124,30 +124,7 @@ class PliNotes(models.Model):
     notes = models.ForeignKey(
         Notes, related_name="notes", on_delete=models.CASCADE
     )  # 노트 ID (외래키)
-    note_memo = models.TextField(null=True)  # 해당 노트에 대한 메모
+    note_memo = models.TextField(null=True, blank=True)  # 해당 노트에 대한 메모
     created_at = models.DateTimeField(auto_now_add=True)  # 추가 날짜
 
 
-
-    
-
-
-    '''
-    EMOTION_CHOICES = [
-        ("행복", "행복"),
-        ("설렘", "설렘"),
-        ("희망", "희망"),
-        ("사랑", "사랑"),
-        ("평온", "평온"),
-        ("벅참", "벅참"),
-        ("감동", "감동"),
-        ("쾌감", "쾌감"),
-        ("신남", "신남"),
-        ("용기", "용기"),
-        ("센치함", "센치함"),
-        ("그리움", "그리움"),
-        ("위로", "위로"),
-        ("슬픔", "슬픔"),
-        ("비장", "비장"),
-    ]
-    '''
