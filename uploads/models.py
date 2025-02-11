@@ -1,3 +1,7 @@
 from django.db import models
+from notes.models import Notes
 
-# Create your models here.
+"""
+class NoteUpload(models.Model):
+    note = models.ForeignKey(Notes, on_delete=models.CASCADE)  
+"""

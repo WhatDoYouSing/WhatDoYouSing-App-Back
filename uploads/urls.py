@@ -4,8 +4,8 @@ from .views import *
 app_name = "uploads"
 
 urlpatterns = [
-    path("note/songs/", SongNoteUploadView.as_view()),
-    #path("note/yt/", YTNoteUploadView.as_view()),
-    #path("note/self/", NoteUploadView.as_view())
-    #path("pli/", PliUploadView.as_view())
+    path("note/", SongNoteUploadView.as_view()),  # 노트(음원)업로드
+    path("note/yt/", YTNoteUploadView.as_view()),  # 노트(유튜브)업로드
+    path("note/self/", NoteUploadView.as_view()),  # 노트(직접)업로드
+    # path("pli/", PliUploadView.as_view())
 ]

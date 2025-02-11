@@ -53,7 +53,9 @@ class Notes(models.Model):
     )  # 게시물 작성자 ID
     created_at = models.DateTimeField(auto_now_add=True)  # 작성 날짜
     is_updated = models.BooleanField(default=False)  # 수정 여부
-    album_art = models.CharField(max_length=200)  # 앨범 아트(유튜브 썸네일 URL)
+    album_art = models.CharField(
+        max_length=200, null=True, blank=True
+    )  # 앨범 아트(유튜브 썸네일 URL)
     song_title = models.CharField(max_length=200)  # 노래 제목(유튜브 영상 제목)
     artist = models.CharField(max_length=200)  # 아티스트 이름(유튜브 채널명)
     lyrics = models.TextField(null=True, blank=True)
