@@ -25,3 +25,4 @@ class LogInView(views.APIView):
         if serializer.is_valid():
             return Response({'message': "로그인 성공", 'data': serializer.validated_data}, status=status.HTTP_200_OK)
         return Response({'message':'로그인 실패', 'error':serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    

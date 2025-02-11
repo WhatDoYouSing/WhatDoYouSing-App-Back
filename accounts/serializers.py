@@ -61,3 +61,9 @@ class LogInSerializer(serializers.Serializer):
         }
 
         return data
+    
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "nickname", "profile"]
