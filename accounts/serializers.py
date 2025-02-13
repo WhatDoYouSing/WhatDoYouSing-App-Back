@@ -67,3 +67,83 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "nickname", "profile"]
+
+class UsernameUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id','username']
+
+class PasswordUpdateSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=128, write_only=True)
+    new_password = serializers.CharField(max_length=128, write_only=True)
+
+class UserDeleteSerializer(serializers.Serializer):
+    password = serializers.CharField(max_length=128, write_only=True,  style={'input_type': 'password'})
+    reason = serializers.ChoiceField(choices=UserDeletion.REASON_CHOICES, required=True)
+    custom_reason = serializers.CharField(required=False, allow_blank=True)
+    confirm_delete = serializers.BooleanField(required=True)
+
+    def validate(self, data):
+        """탈퇴 동의 확인"""
+        if not data.get("confirm_delete"):
+            raise serializers.ValidationError({"confirm_delete": "탈퇴를 진행하려면 동의해야 합니다."})
+
+        # 7번(기타) 선택 시 custom_reason 필수
+        if data["reason"] == 7 and not data.get("custom_reason"):
+            raise serializers.ValidationError({"custom_reason": "기타 사유를 입력해야 합니다."})
+
+        return data
+
+ADJECTIVES = [
+    "멋진", "행복한", "슬픈", "낭만적인", "감상적인", "설레는", "희망찬", "센치한", "벅차는", "비장한",
+    "신나는", "그리운", "평온한", "잔잔한", "정열적인", "빠른", "위대한", "천재적인", "독창적인", "혁신적인",
+    "감동적인", "뛰어난", "훌륭한", "정교한", "독보적인", "창의적인", "심오한", "감각적인", "섬세한", "풍부한",
+    "신비로운", "아름다운", "감미로운", "우아한", "인상적인", "강렬한", "차분한", "다채로운", "명료한", "세련된",
+    "대담한", "순수한", "고요한", "따뜻한", "기품있는", "진지한", "자유로운", "영예로운", "매력적인", "용감한",
+    "찬란한", "고상한", "고귀한", "절묘한", "매혹적인", "명석한", "예리한", "단아한", "여유로운", "빛나는",
+    "눈부신", "기쁜", "현대적인", "고풍스러운", "활기찬", "고전적인", "향기로운", "탁월한", "빼어난", "묘한",
+    "우렁찬", "정직한", "소박한", "유쾌한", "활발한", "애틋한", "다정한", "근사한", "새로운", "자연스러운",
+    "기운찬", "부드러운", "간결한", "원숙한", "안정적인", "놀라운", "완벽한", "경이로운", "따스한", "힘찬",
+    "진실된", "명확한", "경쾌한", "조화로운", "유연한", "기발한", "도전적인", "특별한", "편안한", "유려한",
+    "갸냘픈", "거센", "고른", "고마운", "고운", "괜찮은", "구석진", "귀여운", "그리운", "기쁜", "깊은",
+    "깨끗한", "나은", "난데없는", "네모난", "느닷없는", "느린", "동그란", "둥근", "뛰어난", "밝은", "보람찬",
+    "빠른", "뽀얀", "새로운", "성가신", "수줍은", "쏜살같은", "알맞은", "엄청난", "여문", "예쁜", "작은",
+    "재미있는", "점잖은", "좋은", "즐거운", "지혜로운", "짓궂은", "한결같은", "희망찬", "힘찬"
+]
+NOUNS = [
+    "베토벤", "모차르트", "바흐", "쇼팽", "드뷔시", "브람스", "비발디", "슈만", "차이콥스키", "엘가",
+    "푸치니", "말러", "헨델", "마쇼", "란디니", "뒤페", "프레", "탈리스", "랏소", "제수알도",
+    "가브리엘", "몬테베르디", "쉬츠", "륄리", "북스테후데", "파헬벨", "퍼셀", "쿠프랭", "라모", "텔레만",
+    "글룩", "하이든", "파가니니", "폰베버", "로시니", "슈베르트", "도니제티", "벨리니", "베를리오즈", "글린카",
+    "멘델스존", "리스트", "바그너", "구노", "오펜바흐", "프랑크", "랄로", "스메타나", "브루크너", "슈트라우스",
+    "보로딘", "생상스", "브루흐", "비제", "무소르그스키", "드보르자크", "그리그", "사라사테", "림스키", "포레",
+    "볼프", "알베니스", "글라주노프", "시벨리우스", "사티", "스크랴빈", "윌리엄스", "라흐마니노프", "홀스트", "라벨",
+    "파야", "레스피기", "야나체크", "쇤베르크", "아이브스", "버르토크", "스트라빈스키", "코다이", "베베른", "베르크",
+    "프로코피예프", "힌데미트", "거슈윈", "코플랜드", "로드리고", "쇼스타코비치", "메시앙", "케이지", "브리튼", "피아졸라",
+    "노노", "슈톡하우젠", "바렌보임", "오르프", "불레즈", "길렐스", "에밀", "알캉", "고도프스키", "이자이"
+]
+NUMBERS = [str(i).zfill(3) for i in range(1000)]  # 000 ~ 999
+
+PATTERNS = ["adjective_noun", "noun_number", "adjective_noun_number"]
+
+import random
+
+class RandomNicknameSerializer(serializers.Serializer):
+    pattern = serializers.ChoiceField(choices=PATTERNS, required=False, default="adjective_noun")
+
+    def generate_random_nickname(self):
+        pattern = random.choice(PATTERNS)
+        max_attempts = 10  # 9자 이하의 닉네임을 찾기 위한 최대 시도 횟수
+
+        for _ in range(max_attempts):
+            if pattern == "adjective_noun":
+                nickname = random.choice(ADJECTIVES) + random.choice(NOUNS)
+            elif pattern == "noun_number":
+                nickname = random.choice(NOUNS) + random.choice(NUMBERS)
+            else:  # pattern == "adjective_noun_number"
+                nickname = random.choice(ADJECTIVES) + random.choice(NOUNS) + random.choice(NUMBERS)
+
+            if len(nickname) <= 9:
+                return nickname
+        
+        return nickname[:9]

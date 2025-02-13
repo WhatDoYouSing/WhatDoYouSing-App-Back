@@ -14,7 +14,7 @@ class Title(models.Model):
 
     def __str__(self):
         return self.name  # 관리자 페이지 등에서 이름으로 표시
-
+ 
 class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name="이메일 주소")
     username = models.CharField(max_length=150, unique=True, verbose_name="아이디")
@@ -69,7 +69,7 @@ class UserDeletion(models.Model):
         (4, "원하는 기능이 없어서"),
         (5, "호기심에 설치한 앱이어서"),
         (6, "앱을 사용할 시간이 없어서"),
-        (7, "기타"),  # "기타" 선택지 추가
+        (7, "기타"),  # "기 선택지 추가
     ]
     # 탈퇴한 사용자 ID (외래키: User 모델 참조)
     user = models.ForeignKey(
