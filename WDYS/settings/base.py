@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import environ
+import os
 
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -19,16 +21,25 @@ SITE_ID = 1
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-
+env = environ.Env(
+    DEBUG=(bool, False)
+)
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
+#SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
+
+SECRET_KEY = env('DJANGO_SECRET_KEY')
+DEBUG = env('DEBUG')
+KAKAO_CLIENT_ID = env('KAKAO_CLIENT_ID')
+KAKAO_APP_ID = env('KAKAO_APP_ID')
+KAKAO_CLIENT_SECRET_KEY = env('KAKAO_CLIENT_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+#DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -56,6 +67,7 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'rest_auth.registration',
+    'allauth.socialaccount.providers.kakao',
 
     'accounts',
     'collects',

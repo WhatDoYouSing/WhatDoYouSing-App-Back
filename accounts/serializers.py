@@ -3,6 +3,19 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from .models import *
 
+from rest_framework import serializers
+
+class TermSerializer(serializers.Serializer):
+    required_consent = serializers.BooleanField(required=True)  # 필수 약관 동의 (필수)
+    push_notification_consent = serializers.BooleanField(required=False, default=False)  # 푸시알림 동의 (선택)
+    marketing_consent = serializers.BooleanField(required=False, default=False)  # 마케팅 동의 (선택)
+
+    def validate_required_consent(self, value):
+        """ 필수 약관 동의가 False면 예외 발생 """
+        if not value:
+            raise serializers.ValidationError("필수 약관 동의는 반드시 필요합니다.")
+        return value
+
 class SignUpSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -147,3 +160,54 @@ class RandomNicknameSerializer(serializers.Serializer):
                 return nickname
         
         return nickname[:9]
+    
+#카카오
+class KSignUpSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = ['id','username','password']
+
+    def create(self, validated_data):
+        user = User.objects.create(
+            username = validated_data['username'],
+            #password = validated_data['password'],
+            #nickname = validated_data['nickname'],
+        )
+
+        user.set_password(validated_data['password'])
+        user.save()
+
+        return user
+    
+class KLogInSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=64)
+    password = serializers.CharField(max_length=128, write_only=True)
+
+    def validate(self, data):
+        username=data.get("username", None)
+        password=data.get("password", None)
+
+        if User.objects.filter(username=username).exists():
+            user = User.objects.get(username=username)
+
+            if not user.check_password(password):
+                raise serializers.ValidationError('잘못된 비밀번호입니다.')
+            else:
+                token = RefreshToken.for_user(user)
+                refresh = str(token)
+                access = str(token.access_token)
+
+                data = {
+                    'id': user.id,
+                    'username':user.username,
+                    'nickname': user.nickname,
+                    'profile':user.profile,
+                    'access_token': access,
+                    'refresh_token': refresh,
+                }
+
+                return data
+        else: 
+            raise serializers.ValidationError('존재하지 않는 사용자입니다.')
+         
