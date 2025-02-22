@@ -69,25 +69,23 @@ class Notes(models.Model):
 
     emotion = models.ForeignKey(
         Emotions,
-        related_name="emotion",
+        related_name="notes_emotion",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )  # 감정
-    tag_time = models.ForeignKey(
-        Times, related_name="tag_time", on_delete=models.CASCADE, null=True, blank=True
+    tag_time = models.ManyToManyField(
+        Times, related_name="tag_time", null=True, blank=True
     )  # 시간 태그
-    tag_season = models.ForeignKey(
+    tag_season = models.ManyToManyField(
         Seasons,
         related_name="tag_season",
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )  # 계절 태그
-    tag_context = models.ForeignKey(
+    tag_context = models.ManyToManyField(
         Contexts,
         related_name="tag_context",
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )  # 일상맥락 태그
@@ -120,24 +118,21 @@ class Plis(models.Model):
         max_length=10, choices=VISIBILITY_CHOICES, default="public"
     )  # 공개 범위
 
-    tag_time = models.ForeignKey(
+    tag_time = models.ManyToManyField(
         Times,
         related_name="pli_tag_time",
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )  # 시간 태그
-    tag_season = models.ForeignKey(
+    tag_season = models.ManyToManyField(
         Seasons,
         related_name="pli_tag_season",
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )  # 계절 태그
-    tag_context = models.ForeignKey(
+    tag_context = models.ManyToManyField(
         Contexts,
         related_name="pli_tag_context",
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )  # 일상맥락 태그
@@ -150,7 +145,7 @@ class PliNotes(models.Model):
 
     id = models.AutoField(primary_key=True)  # 고유 ID
     plis = models.ForeignKey(
-        Plis, related_name="plis", on_delete=models.CASCADE
+        Plis, related_name="plinotes", on_delete=models.CASCADE
     )  # 플리 ID (외래키)
     notes = models.ForeignKey(
         Notes, related_name="notes", on_delete=models.CASCADE

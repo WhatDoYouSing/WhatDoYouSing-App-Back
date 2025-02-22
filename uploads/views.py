@@ -27,15 +27,19 @@ class SongNoteUploadView(views.APIView):
             if note.emotion:
                 note.emotion.count += 1
                 note.emotion.save()
-            if note.tag_time:
-                note.tag_time.count += 1
-                note.tag_time.save()
-            if note.tag_season:
-                note.tag_season.count += 1
-                note.tag_season.save()
-            if note.tag_context:
-                note.tag_context.count += 1
-                note.tag_context.save()
+
+            for tag in note.tag_time.all():
+                tag.count += 1
+                tag.save()
+
+            for tag in note.tag_season.all():
+                tag.count += 1
+                tag.save()
+
+            for tag in note.tag_context.all():
+                tag.count += 1
+                tag.save()
+
             return Response(
                 {"message": "노트(음원) 작성 성공", "data": serializer.data},
                 status=status.HTTP_201_CREATED,
@@ -56,15 +60,19 @@ class YTNoteUploadView(views.APIView):
             if note.emotion:
                 note.emotion.count += 1
                 note.emotion.save()
-            if note.tag_time:
-                note.tag_time.count += 1
-                note.tag_time.save()
-            if note.tag_season:
-                note.tag_season.count += 1
-                note.tag_season.save()
-            if note.tag_context:
-                note.tag_context.count += 1
-                note.tag_context.save()
+
+            for tag in note.tag_time.all():
+                tag.count += 1
+                tag.save()
+
+            for tag in note.tag_season.all():
+                tag.count += 1
+                tag.save()
+
+            for tag in note.tag_context.all():
+                tag.count += 1
+                tag.save()
+
             return Response(
                 {"message": "노트(유튜브) 작성 성공", "data": serializer.data},
                 status=status.HTTP_201_CREATED,
@@ -85,15 +93,19 @@ class NoteUploadView(views.APIView):
             if note.emotion:
                 note.emotion.count += 1
                 note.emotion.save()
-            if note.tag_time:
-                note.tag_time.count += 1
-                note.tag_time.save()
-            if note.tag_season:
-                note.tag_season.count += 1
-                note.tag_season.save()
-            if note.tag_context:
-                note.tag_context.count += 1
-                note.tag_context.save()
+
+            for tag in note.tag_time.all():
+                tag.count += 1
+                tag.save()
+
+            for tag in note.tag_season.all():
+                tag.count += 1
+                tag.save()
+
+            for tag in note.tag_context.all():
+                tag.count += 1
+                tag.save()
+
             return Response(
                 {"message": "노트(직접) 작성 성공", "data": serializer.data},
                 status=status.HTTP_201_CREATED,
@@ -104,33 +116,50 @@ class NoteUploadView(views.APIView):
         )
 
 
-"""
-class PostAddView(views.APIView):
-    serializer_class = PostSerializer
-    #permission_classes = [IsAuthenticated]  
+# 플리 생성 시 노트 목록
+class NoteListView(views.APIView):
+    def get(self, request, format=None):
 
-    def post(self, request, format=None):  # 게시글 작성 POST 메소드
-        if not request.user.is_authenticated:  # Check if the user is not authenticated
-            return Response({"message": "로그인을 해주세요"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        required_fields = ['lyrics', 'content', 'title', 'singer', 'sings_emotion']
-        for field in required_fields:
-            if field not in request.data:
-                return Response({"message": f"{field} 필드를 작성해 주세요."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        serializer = PostSerializer(data=request.data)
+        keyword = request.GET.get("keyword")
+
+        myposts = Notes.objects.filter(user=request.user).order_by("-created_at")
+
+        if keyword:
+            myposts = myposts.filter(
+                Q(lyrics__icontains=keyword)
+                | Q(artist__icontains=keyword)
+                | Q(song_title__icontains=keyword)
+            )
+
+        serializer = NotesListSerializer(myposts, many=True)
+        return Response(
+            {"message": "MY 노트 목록 반환 성공", "data": serializer.data},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PliUploadView(views.APIView):
+    def post(self, request, format=None):
+        serializer = PliUploadSerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
-            serializer.save(author=request.user)
-            return Response({"message": "가사 작성 성공", "data": serializer.data}, status=status.HTTP_200_OK)
-        return Response({"message": "가사 작성 실패", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            plis = serializer.save()  # serializers.py의 create() 메서드 호출
 
-class PostDelView(views.APIView):
-    serializer_class = PostSerializer
+            for tag in plis.tag_time.all():
+                tag.count += 1
+                tag.save()
 
-    def delete(self, request, pk, format=None):
-        post = get_object_or_404(Post, pk=pk)
-        post.delete()
-        return Response({"message": "가사 삭제 성공"}, status=status.HTTP_204_NO_CONTENT)
-        
+            for tag in plis.tag_season.all():
+                tag.count += 1
+                tag.save()
 
-        """
+            for tag in plis.tag_context.all():
+                tag.count += 1
+                tag.save()
+
+            return Response(
+                {"message": "플리 업로드 성공", "data": PliUploadSerializer(plis).data},
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
