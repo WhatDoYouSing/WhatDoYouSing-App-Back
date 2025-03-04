@@ -59,7 +59,9 @@ class Notes(models.Model):
     song_title = models.CharField(max_length=200)  # 노래 제목(유튜브 영상 제목)
     artist = models.CharField(max_length=200)  # 아티스트 이름(유튜브 채널명)
     lyrics = models.TextField(null=True, blank=True)
-    link = models.CharField(max_length=200)  # 관련 링크(유튜브 URL 등)
+    link = models.CharField(
+        max_length=200, null=True, blank=True
+    )  # 관련 링크(유튜브 URL 등)
     memo = models.TextField()  # 노트 내용(메모)
     visibility = models.CharField(
         max_length=10, choices=VISIBILITY_CHOICES, default="public"
