@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import User
+
 # Create your models here.
 
 
@@ -97,25 +98,18 @@ class Notes(models.Model):
 
     def __str__(self):
         return self.song_title
-    
+
+
 # 노트에 다른 사용자가 감정 등록
 class NoteEmotion(models.Model):
-    note = models.ForeignKey(
-        Notes, 
-        on_delete=models.CASCADE,
-        verbose_name="노트"
-    )
+    note = models.ForeignKey(Notes, on_delete=models.CASCADE, verbose_name="노트")
     user = models.ForeignKey(
-        "accounts.User",  
-        on_delete=models.CASCADE,
-        verbose_name="사용자"
+        "accounts.User", on_delete=models.CASCADE, verbose_name="사용자"
     )
-    emotion = models.ForeignKey(
-        Emotions,  
-        on_delete=models.CASCADE,
-        verbose_name="감정"
+    emotion = models.ForeignKey(Emotions, on_delete=models.CASCADE, verbose_name="감정")
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name="감정을 남긴 날짜"
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="감정을 남긴 날짜")
 
     class Meta:
         db_table = "note_emotions"
@@ -124,7 +118,6 @@ class NoteEmotion(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.emotion.name} on {self.note.song_title}"
-
 
 
 class Plis(models.Model):
@@ -184,26 +177,23 @@ class PliNotes(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)  # 추가 날짜
 
 
-
 class NoteComment(models.Model):
     note = models.ForeignKey(
-        Notes, 
+        Notes,
         on_delete=models.CASCADE,
         verbose_name="대상 노트",
-        related_name="comments" 
+        related_name="comments",
     )
     user = models.ForeignKey(
-        User, 
+        User,
         on_delete=models.CASCADE,
         verbose_name="댓글 작성자",
-        related_name="note_comments"  
+        related_name="note_comments",
     )
     content = models.TextField(verbose_name="댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_note_comments"  
+        User, verbose_name="좋아요", related_name="liked_note_comments"
     )
 
     class Meta:
@@ -217,23 +207,21 @@ class NoteComment(models.Model):
 
 class NoteReply(models.Model):
     comment = models.ForeignKey(
-        NoteComment,  
+        NoteComment,
         on_delete=models.CASCADE,
         verbose_name="부모 댓글",
-        related_name="replies"  
+        related_name="replies",
     )
     user = models.ForeignKey(
-        User, 
+        User,
         on_delete=models.CASCADE,
         verbose_name="대댓글 작성자",
-        related_name="note_replies"  
+        related_name="note_replies",
     )
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_note_replies"  
+        User, verbose_name="좋아요", related_name="liked_note_replies"
     )
 
     class Meta:
@@ -250,20 +238,18 @@ class PliComment(models.Model):
         Plis,
         on_delete=models.CASCADE,
         verbose_name="대상 플리",
-        related_name="comments"  
+        related_name="comments",
     )
     user = models.ForeignKey(
-        User,  
+        User,
         on_delete=models.CASCADE,
         verbose_name="댓글 작성자",
-        related_name="pli_comments" 
+        related_name="pli_comments",
     )
     content = models.TextField(verbose_name="댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_pli_comments"  
+        User, verbose_name="좋아요", related_name="liked_pli_comments"
     )
 
     class Meta:
@@ -280,20 +266,18 @@ class PliReply(models.Model):
         PliComment,
         on_delete=models.CASCADE,
         verbose_name="부모 댓글",
-        related_name="replies"  
+        related_name="replies",
     )
     user = models.ForeignKey(
         User,  # User 모델 참조
         on_delete=models.CASCADE,
         verbose_name="대댓글 작성자",
-        related_name="pli_replies" 
+        related_name="pli_replies",
     )
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_pli_replies"  
+        User, verbose_name="좋아요", related_name="liked_pli_replies"
     )
 
     class Meta:
