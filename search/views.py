@@ -304,3 +304,76 @@ class SearchPlisView(views.APIView):
             {"message": "탐색결과 플리 조회 성공", "data": filtered_data},
             status=status.HTTP_200_OK,
         )
+
+
+# 통합검색(작성자)
+class SearchWritersView(views.APIView):
+    def get(self, request):
+        keyword = request.GET.get("keyword", "").strip()  # strip으로 공백 제거
+        writer = request.GET.get("writer", "").strip()  # strip으로 공백 제거
+
+        query = Q()
+        user_query = None
+
+        if not writer and not keyword:
+            return Response(
+                {
+                    "message": "탐색결과 작성자 조회 성공",
+                    "data": {"user": []},  # 빈 리스트 반환
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # 1. 사용자 검색 필터 적용 (@닉네임, @아이디, from:@아이디)
+        if writer:
+            if writer.startswith("from:@"):
+                username = writer.replace(
+                    "from:@", ""
+                ).strip()  # `from:@아이디` → 아이디만 추출
+                try:
+                    user = User.objects.get(username=username)  # ✅ ID(username)만 검색
+                    user_query = Q(id=user.id)
+                except User.DoesNotExist:
+                    return Response(
+                        {"message": "해당 사용자가 존재하지 않습니다."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            elif writer.startswith("@"):
+                username_or_nickname = writer.replace(
+                    "@", ""
+                ).strip()  # `@닉네임` → 닉네임 또는 아이디 추출
+                try:
+                    user = User.objects.get(
+                        Q(username=username_or_nickname)
+                        | Q(nickname=username_or_nickname)
+                    )
+                    user_query = Q(
+                        id=user.id
+                    )  # ID(username) 또는 닉네임(nickname) 검색
+                except User.DoesNotExist:
+                    return Response(
+                        {"message": "해당 사용자가 존재하지 않습니다."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+        # 2. 키워드 검색 적용 (사용자 검색이 아닐 경우)
+        if keyword:
+            keyword_filter = Q(nickname__icontains=keyword)  # 닉네임으로 작성자 검색색
+            query &= keyword_filter  # ✅ 기존 조건과 AND 결합
+
+        # 3. 사용자 검색이 있는 경우, 사용자 필터 적용
+        if user_query:
+            query &= user_query
+
+        # ✅ 검색 실행
+        search_results = User.objects.filter(query).distinct()
+
+        return Response(
+            {
+                "message": "탐색결과 작성자 조회 성공",
+                "data": {
+                    "user": SearchWritersSerializer(search_results, many=True).data
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

@@ -243,3 +243,14 @@ class SearchPlisSerializer(serializers.ModelSerializer):
     SongTitle = SearchPlisLSSPSerializer(many=True)  # 곡명에서 검색된 플리
     Singer = SearchPlisLSSPSerializer(many=True)  # 가수에서 검색된 플리
     PlisTitle = SearchPlisLSSPSerializer(many=True)  # 플리 제목에서 검색된 플리
+
+
+class SearchWritersSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "nickname",
+            "username",
+            "profile",
+        ]
