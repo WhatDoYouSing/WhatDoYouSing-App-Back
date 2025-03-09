@@ -2,111 +2,34 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from .models import *
+import random
 
-from rest_framework import serializers
+User = get_user_model()
 
-class TermSerializer(serializers.Serializer):
-    required_consent = serializers.BooleanField(required=True)  # 필수 약관 동의 (필수)
-    push_notification_consent = serializers.BooleanField(required=False, default=False)  # 푸시알림 동의 (선택)
-    marketing_consent = serializers.BooleanField(required=False, default=False)  # 마케팅 동의 (선택)
+# 일반/소셜 공통, 유저 관리 ############################################################################################
 
-    def validate_required_consent(self, value):
-        """ 필수 약관 동의가 False면 예외 발생 """
-        if not value:
-            raise serializers.ValidationError("필수 약관 동의는 반드시 필요합니다.")
-        return value
+# ✅ 칭호 Serializer (User의 ForeignKey 반영)
+#class TitleSerializer(serializers.ModelSerializer):
+#    class Meta:
+#        model = Title
+#        fields = ['id', 'name', 'emoji']
 
-class SignUpSerializer(serializers.ModelSerializer):
+# ✅ 회원가입 공통 부모 Serializer
+class AbstractSignupSerializer(serializers.ModelSerializer):
+    """일반 및 소셜 회원가입 공통 필드"""
+    #title = TitleSerializer(read_only=True)  # 칭호 정보 포함
 
     class Meta:
         model = User
-        fields = ['id','username','password','email','nickname','required_consent','push_notification_consent','marketing_consent']
+        fields = ['id', 'username', 'nickname']
 
-    def create(self, validated_data):
-        user = User(
-            username = validated_data['username'],
-            password = validated_data['password'],
-            email = validated_data['email'],
-            nickname = validated_data['nickname'],
-            required_consent = validated_data['required_consent'],
-            push_notification_consent = validated_data['push_notification_consent'],
-            marketing_consent = validated_data['marketing_consent']
-        )
-
-        user.set_password(validated_data['password'])
-        user.save()
-
-        return user
-    
-User = get_user_model()
-
-class LogInSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(max_length=128, write_only=True)
-
-    def validate(self, data):
-        email = data.get("email")
-        password = data.get("password")
-
-        if email is None:
-            raise serializers.ValidationError('이메일을 입력해주세요.')
-        if password is None:
-            raise serializers.ValidationError('비밀번호를 입력해주세요.')
-
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError('존재하지 않는 사용자입니다.')
-
-        if not user.check_password(password):
-            raise serializers.ValidationError('잘못된 비밀번호입니다.')
-
-        # RefreshToken 생성
-        token = RefreshToken.for_user(user)
-        
-        data = {
-            'id': user.id,
-            'email': user.email,
-            'nickname': user.nickname,
-            'profile': user.profile,
-            'access_token': str(token.access_token),
-            'refresh_token': str(token),
-        }
-
-        return data
-    
-
+# ✅ 유저 serializer
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "nickname", "profile"]
 
-class UsernameUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id','username']
-
-class PasswordUpdateSerializer(serializers.Serializer):
-    current_password = serializers.CharField(max_length=128, write_only=True)
-    new_password = serializers.CharField(max_length=128, write_only=True)
-
-class UserDeleteSerializer(serializers.Serializer):
-    password = serializers.CharField(max_length=128, write_only=True,  style={'input_type': 'password'})
-    reason = serializers.ChoiceField(choices=UserDeletion.REASON_CHOICES, required=True)
-    custom_reason = serializers.CharField(required=False, allow_blank=True)
-    confirm_delete = serializers.BooleanField(required=True)
-
-    def validate(self, data):
-        """탈퇴 동의 확인"""
-        if not data.get("confirm_delete"):
-            raise serializers.ValidationError({"confirm_delete": "탈퇴를 진행하려면 동의해야 합니다."})
-
-        # 7번(기타) 선택 시 custom_reason 필수
-        if data["reason"] == 7 and not data.get("custom_reason"):
-            raise serializers.ValidationError({"custom_reason": "기타 사유를 입력해야 합니다."})
-
-        return data
-
+# ✅ 랜덤 닉네임 Serializer
 ADJECTIVES = [
     "멋진", "행복한", "슬픈", "낭만적인", "감상적인", "설레는", "희망찬", "센치한", "벅차는", "비장한",
     "신나는", "그리운", "평온한", "잔잔한", "정열적인", "빠른", "위대한", "천재적인", "독창적인", "혁신적인",
@@ -136,15 +59,13 @@ NOUNS = [
     "노노", "슈톡하우젠", "바렌보임", "오르프", "불레즈", "길렐스", "에밀", "알캉", "고도프스키", "이자이"
 ]
 NUMBERS = [str(i).zfill(3) for i in range(1000)]  # 000 ~ 999
-
 PATTERNS = ["adjective_noun", "noun_number", "adjective_noun_number"]
 
-import random
-
+# ✅ 랜덤 닉네임 Serializer
 class RandomNicknameSerializer(serializers.Serializer):
-    pattern = serializers.ChoiceField(choices=PATTERNS, required=False, default="adjective_noun")
+    pattern = serializers.ChoiceField(choices=PATTERNS, required=False)
 
-    def generate_random_nickname(self):
+    def generate_random_nickname(self, pattern):
         pattern = random.choice(PATTERNS)
         max_attempts = 10  # 9자 이하의 닉네임을 찾기 위한 최대 시도 횟수
 
@@ -153,35 +74,192 @@ class RandomNicknameSerializer(serializers.Serializer):
                 nickname = random.choice(ADJECTIVES) + random.choice(NOUNS)
             elif pattern == "noun_number":
                 nickname = random.choice(NOUNS) + random.choice(NUMBERS)
-            else:  # pattern == "adjective_noun_number"
+            else:
                 nickname = random.choice(ADJECTIVES) + random.choice(NOUNS) + random.choice(NUMBERS)
 
             if len(nickname) <= 9:
                 return nickname
-        
-        return nickname[:9]
+        return nickname[:9]  # 9자 이하 유지
     
-#카카오
+# 📌 유저 닉네임 변경 Serializer
+
+# ✅ 유저 아이디 변경 Serializer
+class ServiceIDUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id','serviceID']
+
+# ✅ 유저 비밀번호 변경 serializer
+class PasswordUpdateSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=128, write_only=True)
+    new_password = serializers.CharField(max_length=128, write_only=True)
+    
+# ✅ 유저 탈퇴 serializer    
+class UserDeleteSerializer(serializers.Serializer):
+    password = serializers.CharField(max_length=128, write_only=True,  style={'input_type': 'password'})
+    reason = serializers.ChoiceField(choices=UserDeletion.REASON_CHOICES, required=True)
+    custom_reason = serializers.CharField(required=False, allow_blank=True)
+    confirm_delete = serializers.BooleanField(required=True)
+
+    def validate(self, data):
+        """탈퇴 동의 확인"""
+        if not data.get("confirm_delete"):
+            raise serializers.ValidationError({"confirm_delete": "탈퇴를 진행하려면 동의해야 합니다."})
+
+        # 7번(기타) 선택 시 custom_reason 필수
+        if data["reason"] == 7 and not data.get("custom_reason"):
+            raise serializers.ValidationError({"custom_reason": "기타 사유를 입력해야 합니다."})
+
+        return data
+
+# ✅ 유저 칭호 관리 Serializer
+#class UserTitleSerializer(serializers.ModelSerializer):
+#    title = TitleSerializer(read_only=True)
+
+#    class Meta:
+#        model = UserTitle
+#        fields = ['user', 'title', 'is_active', 'acquired_at']    
+
+# 일반 유저 ############################################################################################
+
+# ✅ 일반 회원가입 Serializer
+class GeneralSignUpSerializer(AbstractSignupSerializer):
+    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField()
+    required_consent = serializers.BooleanField()
+    push_notification_consent = serializers.BooleanField(default=False)
+    marketing_consent = serializers.BooleanField(default=False)
+
+    class Meta(AbstractSignupSerializer.Meta):
+        fields = AbstractSignupSerializer.Meta.fields + [
+            'email', 'password', 'required_consent', 'push_notification_consent', 'marketing_consent'
+        ]
+
+    def validate_required_consent(self, value):
+        if value is not True:
+            raise serializers.ValidationError("필수 약관에 동의해야 합니다.")
+        return value
+
+    def create(self, validated_data):
+        first_title = Title.objects.first()
+        if not validated_data.get('title') and first_title:
+            validated_data['title'] = first_title.name  # 기본 칭호 적용
+
+        user = User(
+            username=validated_data['username'],
+            serviceID=validated_data['username'], 
+            email=validated_data['email'],
+            nickname=validated_data['nickname'],
+            required_consent=validated_data['required_consent'],
+            push_notification_consent=validated_data.get('push_notification_consent', False),
+            marketing_consent=validated_data.get('marketing_consent', False)
+        )
+
+        user.set_password(validated_data['password'])  # 비밀번호 해싱
+        user.save()
+        return user
+
+
+
+# ✅ 일반 로그인 Serializer
+class LogInSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(max_length=128, write_only=True)
+
+    def validate(self, data):
+        email = data.get("email")
+        password = data.get("password")
+
+        if not email:
+            raise serializers.ValidationError('이메일을 입력해주세요.')
+        if not password:
+            raise serializers.ValidationError('비밀번호를 입력해주세요.')
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError('존재하지 않는 사용자입니다.')
+
+        if not user.check_password(password):
+            raise serializers.ValidationError('잘못된 비밀번호입니다.')
+
+        return self.generate_tokens(user)
+
+    def generate_tokens(self, user):
+        """토큰 생성"""
+        token = RefreshToken.for_user(user)
+        return {
+            'id': user.id,
+            'email': user.email,
+            'nickname': user.nickname,
+            'profile': user.profile,
+            #'title': TitleSerializer(user.title).data if user.title else None,  # 칭호 추가
+            'access_token': str(token.access_token),
+            'refresh_token': str(token),
+        }
+
+# 소셜 공통 ############################################################################################    
+    
+# ✅ 소셜 회원가입 Serializer
+class SocialSignUpSerializer(serializers.ModelSerializer):
+    """소셜 회원가입 완료 Serializer (2차 정보 입력)"""
+    serviceID = serializers.CharField(required=True)  # ✅ 사이트 내에서 사용할 아이디
+    nickname = serializers.CharField(required=True)  # ✅ 닉네임
+    required_consent = serializers.BooleanField()  # ✅ 필수 약관 동의
+    push_notification_consent = serializers.BooleanField(default=False)  # ✅ 푸시 알림 동의
+    marketing_consent = serializers.BooleanField(default=False)  # ✅ 마케팅 동의
+
+    class Meta:
+        model = User
+        fields = [
+            'serviceID', 'nickname', 'required_consent',
+            'push_notification_consent', 'marketing_consent'
+        ]
+
+    def validate_required_consent(self, value):
+        """필수 약관 동의 검증"""
+        if value is not True:
+            raise serializers.ValidationError("필수 약관에 동의해야 합니다.")
+        return value
+
+    def update(self, instance, validated_data):
+        """소셜 회원가입 정보 업데이트 (2차 정보 입력)"""
+        first_title = Title.objects.first()
+
+        instance.serviceID = validated_data.get('serviceID')
+        instance.nickname = validated_data.get('nickname')
+        instance.required_consent = validated_data['required_consent']
+        instance.push_notification_consent = validated_data.get('push_notification_consent', False)
+        instance.marketing_consent = validated_data.get('marketing_consent', False)
+        if not instance.title and first_title:
+            instance.title = first_title.name  # 기본 칭호 자동 설정
+
+        instance.save()
+        return instance
+
+
+# 카카오 유저 ############################################################################################
+
+# ✅ 카카오 회원가입 Serializer
 class KSignUpSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id','username','password']
+        fields = ['id', 'username', 'password']
 
     def create(self, validated_data):
         user = User.objects.create(
-            username = validated_data['username'],
-            #password = validated_data['password'],
-            #nickname = validated_data['nickname'],
+            username=validated_data['username'],
+            auth_provider="kakao",
         )
-
-        user.set_password(validated_data['password'])
+        user.set_password(validated_data['password'])  # 비밀번호 해싱
         user.save()
 
         return user
-    
+
+# ✅ 카카오 로그인 Serializer    
 class KLogInSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=64)
+    username = serializers.CharField(max_length=150)
     password = serializers.CharField(max_length=128, write_only=True)
 
     def validate(self, data):
@@ -210,4 +288,3 @@ class KLogInSerializer(serializers.Serializer):
                 return data
         else: 
             raise serializers.ValidationError('존재하지 않는 사용자입니다.')
-         

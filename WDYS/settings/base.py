@@ -56,7 +56,8 @@ INSTALLED_APPS = [
 
     'corsheaders',
 
-    'rest_auth',
+    #'rest_auth',
+    'dj_rest_auth',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -66,7 +67,7 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
-    'rest_auth.registration',
+    'dj_rest_auth.registration',
     'allauth.socialaccount.providers.kakao',
 
     'accounts',
