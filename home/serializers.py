@@ -15,21 +15,15 @@ class UserSerializer(serializers.ModelSerializer):
 class NoteSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     user = UserSerializer()
-    title = serializers.SerializerMethodField()
-    lyric = serializers.SerializerMethodField()
     emotion = serializers.SerializerMethodField()
     class Meta:
         model = Notes
         fields = [
             'type', 'id', 'user', 'created_at', 'is_updated', 'visibility', 
-            'emotion', 'title', 'lyric', 'album_art', 'memo', 'link'
+            'emotion', 'song_title', 'artist', 'lyrics', 'album_art', 'memo', 'link'
         ]
     def get_type(self,obj):
         return "note"
-    def get_title(self,obj):
-        return obj.song_title+" - "+obj.artist
-    def get_lyric(self,obj):
-        return obj.lyrics
     def get_emotion(self,obj):
         return obj.emotion.name
 
@@ -37,9 +31,7 @@ class NoteSerializer(serializers.ModelSerializer):
 class PliSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     user = UserSerializer()
-    title = serializers.SerializerMethodField()
-    lyric = serializers.SerializerMethodField()
-    emotion = serializers.SerializerMethodField()
+    info = serializers.SerializerMethodField()
     album_art = serializers.SerializerMethodField()
     memo = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
@@ -47,12 +39,12 @@ class PliSerializer(serializers.ModelSerializer):
         model = Plis
         fields = [
             'type', 'id', 'user', 'created_at', 'is_updated', 'visibility', 
-            'emotion', 'title', 'lyric', 'album_art', 'memo', 'link'
+            'info', 'title', 'album_art', 'memo', 'link'
         ]
     def get_type(self,obj):
         return "pli"
-    def get_title(self,obj):
-        return "노트 "+str(PliNotes.objects.filter(plis=obj).count())
+    def get_info(self,obj):
+        return "노트 "+str(PliNotes.objects.filter(plis=obj).count()) # 수정 필요 (임시)
     def get_lyric(self,obj):
         return obj.title
     def get_emotion(self,obj):
@@ -77,19 +69,6 @@ class PliSerializer(serializers.ModelSerializer):
         return None
 
         
-
-# 홈 통합 직렬화
-# class HomeContentSerializer(serializers.Serializer):
-#     content = serializers.SerializerMethodField()
-
-#     def get_content(self, obj):
-#         if obj['type'] == 'note':
-#             return NoteSerializer(obj['content']).data
-#         elif obj['type'] == 'pli':
-#             return PliSerializer(obj['content']).data
-#         return {}
-    
-
 
 class HomeContentSerializer(serializers.Serializer):
     content = serializers.SerializerMethodField()
