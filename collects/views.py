@@ -6,6 +6,7 @@ from notes.models import *
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import *
+from home.serializers import *
 
 
 class CollectView(APIView):
@@ -113,4 +114,108 @@ class ScrapListView(APIView):
         return Response({
             "message": "보관함 조회 성공",
             "data": scrap_list_data
+        }, status=status.HTTP_200_OK)
+
+
+class ScrapListDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    # 특정 보관함 상세 조회
+    def get(self, request, scrap_list_id):
+
+        user = request.user
+        scrap_list = get_object_or_404(ScrapList, id=scrap_list_id)
+
+        if scrap_list.user != user:
+            return Response({"error": "본인의 보관함만 조회할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        # 스크랩된 노트 & 플리 가져오기
+        scrap_notes = ScrapNotes.objects.filter(scrap_list=scrap_list)
+        scrap_playlists = ScrapPlaylists.objects.filter(scrap_list=scrap_list)
+
+        note_ids = scrap_notes.values_list('content_id', flat=True)
+        pli_ids = scrap_playlists.values_list('content_id', flat=True)
+
+        notes = Notes.objects.filter(id__in=note_ids)
+        plis = Plis.objects.filter(id__in=pli_ids)
+
+        # 앨범 아트 4개까지 추출 (노트 기준)
+        album_arts = list(notes.values_list("album_art", flat=True)[:4])
+
+        # 정보 (노트 개수 + 플리 개수)
+        info = []
+        if notes.count():
+            info.append(f"노트 {notes.count()}")
+        if plis.count():
+            info.append(f"플리 {plis.count()}")
+
+        # 콘텐츠 리스트 구성 (노트 + 플리 직렬화)
+        contents = list(NoteSerializer(notes, many=True).data) + list(PliSerializer(plis, many=True).data)
+
+        return Response({
+            "message": "보관함 상세 조회 성공",
+            "data": {
+                "name": scrap_list.name,
+                "album_art": album_arts,
+                "info": " · ".join(info),
+                "contents": contents
+            }
+        }, status=status.HTTP_200_OK)
+
+class ScrapListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    # 새로운 보관함 생성
+    def post(self, request):
+        user = request.user
+        name = request.data.get("name", "").strip()
+
+        if not name:
+            return Response({"error": "보관함 이름을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 보관함 생성
+        scrap_list = ScrapList.objects.create(user=user, name=name)
+
+        return Response({
+            "message": "보관함이 생성되었습니다.",
+            "data": {
+                "id": scrap_list.id,
+                "name": scrap_list.name
+            }
+        }, status=status.HTTP_201_CREATED)
+    
+class ScrapListEditView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, scrap_list_id):
+        user = request.user
+        scrap_list = get_object_or_404(ScrapList, id=scrap_list_id)
+
+        if scrap_list.user != user:
+            return Response({"error": "본인의 보관함만 수정할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        # 보관함 이름 수정
+        name = request.data.get("name", "").strip()
+        if name:
+            scrap_list.name = name
+            scrap_list.save()
+
+        # 삭제할 노트 & 플리 가져오기
+        remove_notes = request.data.get("remove_notes", [])
+        print(remove_notes)
+        remove_plis = request.data.get("remove_plis", [])
+    
+        # 스크랩된 노트 삭제
+        if remove_notes:
+            ScrapNotes.objects.filter(scrap_list=scrap_list, content_id__in=remove_notes).delete()
+
+        # 스크랩된 플리 삭제
+        if remove_plis:
+            ScrapPlaylists.objects.filter(scrap_list=scrap_list, content_id__in=remove_plis).delete()
+
+
+        return Response({
+            "message": "보관함이 수정되었습니다.",
+            "data": {
+                "id": scrap_list.id,
+                "name": scrap_list.name
+            }
         }, status=status.HTTP_200_OK)
