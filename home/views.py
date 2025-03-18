@@ -18,20 +18,6 @@ class HomeView(APIView):
         # 임시 - 필요 시 페이지네이션 추가
 
         user = request.user  # 현재 로그인된 유저
-        
-        # # Notes 필터링: 공개 노트 + 팔로우한 사용자의 'friends' 공개 노트 + 자신이 작성한 노트
-        # notes = Notes.objects.filter(
-        #     Q(visibility='public') | 
-        #     Q(user__in=UserFollows.objects.filter(follower=user).values('following'),visibility='friends') |  # 임시
-        #     Q(user=user)  
-        # ).order_by('-created_at')
-        
-        # # Plis 필터링: 공개 플리 + 팔로우한 사용자의 'friends' 공개 플리 + 자신이 작성한 플리
-        # plis = Plis.objects.filter(
-        #     Q(visibility='public') | 
-        #     Q(user__in=UserFollows.objects.filter(follower=user).values('following'),visibility='friends') | # 임시
-        #     Q(user=user)  
-        # ).order_by('-created_at')
 
 
         friends = UserFollows.objects.filter(
