@@ -17,7 +17,6 @@ User = get_user_model()
 # ✅ 회원가입 공통 부모 Serializer
 class AbstractSignupSerializer(serializers.ModelSerializer):
     """일반 및 소셜 회원가입 공통 필드"""
-    #title = TitleSerializer(read_only=True)  # 칭호 정보 포함
 
     class Meta:
         model = User
@@ -110,7 +109,7 @@ class UserDeleteSerializer(serializers.Serializer):
         if data["reason"] == 7 and not data.get("custom_reason"):
             raise serializers.ValidationError({"custom_reason": "기타 사유를 입력해야 합니다."})
 
-        return data
+        return data 
 
 # ✅ 유저 칭호 관리 Serializer
 #class UserTitleSerializer(serializers.ModelSerializer):
