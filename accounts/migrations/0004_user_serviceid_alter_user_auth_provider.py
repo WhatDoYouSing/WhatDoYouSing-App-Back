@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='serviceID',
-            field=models.CharField(max_length=150, unique=True, verbose_name='서비스 내 아이디'),
+            field=models.CharField(default='test', max_length=150, unique=True, verbose_name='서비스 내 아이디'),
         ),
         migrations.AlterField(
             model_name='user',
