@@ -40,7 +40,7 @@ KAKAO_CLIENT_SECRET_KEY = env('KAKAO_CLIENT_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 #DEBUG = True
-print(KAKAO_APP_ID)
+
 ############# env 가져와야함 !!!!!!!!!!!
 #EMAIL_BACKEND = env('EMAIL_BACKEND')
 #EMAIL_HOST = env('EMAIL_HOST')
