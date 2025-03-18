@@ -75,8 +75,6 @@ class DuplicateIDView(views.APIView):
         
         return Response(response_data, status=status.HTTP_200_OK)
 
-# 📌 [공통] 닉네임 변경
-
 # ✅ [공통] 아이디 변경
 class ChangeServiceIDView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -85,15 +83,7 @@ class ChangeServiceIDView(views.APIView):
     def get(self, request, format=None):
         serializer = self.serializer_class(request.user)
         return Response(serializer.data)
-    '''
-    def patch(self, request):
-        serializer = self.serializer_class(request.user, data=request.data, partial=True)
-        
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'message': '서비스 아이디 변경 성공', 'data': serializer.validated_data}, status=status.HTTP_200_OK)
-        return Response({'message': '서비스 아이디 변경 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-    '''
+
     def patch(self, request):
         if not request.data:  # 📌 입력 데이터가 비어있으면 에러 반환
             return Response({'message': '입력이 없습니다'}, status=status.HTTP_400_BAD_REQUEST)
@@ -157,14 +147,6 @@ class UserDeleteView(views.APIView):
 
 # 일반 유저 ############################################################################################
 
-# 일단 [일반] 가입 플로우 한 번에 해둠, but 나눠야 될 수도 있음
-# 나눠야 한다면 아래와 같이 나눌것
-# 📌 [일반] 약관 동의
-# 📌 [일반] 아이디 입력
-# 📌 [일반] 이메일 확인
-# 📌 [일반] 비밀번호 입력
-# 📌 [일반] 닉네임 입력
-
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
     permission_classes = [AllowAny]
@@ -191,12 +173,6 @@ class LogInView(views.APIView):
         return Response({'message': '로그인 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 # 소셜 유저 ############################################################################################
-
-# 일단 각 플랫폼 가입 후 [소셜] 가입 플로우도 한 번에 해둠, but 나눠야 될 수도 있음
-# 나눠야 한다면 아래와 같이 나눌것
-# 📌 [소셜] 약관 동의
-# 📌 [소셜] 아이디 입력
-# 📌 [소셜] 비밀번호 입력
 
 # ✅ [소셜] 회원가입 설정 마치기
 class SocialSignUpCompleteView(views.APIView):

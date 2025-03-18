@@ -129,7 +129,7 @@ class UserTitle(models.Model):
         related_name="user_titles",  # 역참조 이름
         verbose_name="칭호"
     )
-    is_active = models.BooleanField(default=False, verbose_name="활성화 여부")  # 현재 활성화된 칭호인지
+    #is_active = models.BooleanField(default=False, verbose_name="활성화 여부")  # 현재 활성화된 칭호인지
     acquired_at = models.DateTimeField(default=now, verbose_name="획득 날짜")  # 칭호 획득 날짜
 
     class Meta:
