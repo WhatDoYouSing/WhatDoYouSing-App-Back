@@ -41,6 +41,15 @@ KAKAO_CLIENT_SECRET_KEY = env('KAKAO_CLIENT_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 #DEBUG = True
 
+############# env 가져와야함 !!!!!!!!!!!
+#EMAIL_BACKEND = env('EMAIL_BACKEND')
+#EMAIL_HOST = env('EMAIL_HOST')
+#EMAIL_PORT = env('EMAIL_PORT')
+#EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+#EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+#EMAIL_USE_TLS = True
+#DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 ALLOWED_HOSTS = ['*']
 
 
@@ -56,7 +65,8 @@ INSTALLED_APPS = [
 
     'corsheaders',
 
-    'rest_auth',
+    #'rest_auth',
+    'dj_rest_auth',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -66,7 +76,7 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
-    'rest_auth.registration',
+    'dj_rest_auth.registration',
     'allauth.socialaccount.providers.kakao',
 
     'accounts',

@@ -18,8 +18,8 @@ class Title(models.Model):
 class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name="이메일 주소")
     username = models.CharField(max_length=150, unique=True, verbose_name="아이디")
+    serviceID = models.CharField(max_length=150, unique=True, verbose_name="서비스 내 아이디",null=True,blank=True)
     notif_token = models.TextField(null=True, blank=True, verbose_name="FCM 토큰")
-    #password_hash = models.CharField(max_length=128, verbose_name="암호화된 비밀번호")
     nickname = models.CharField(max_length=50, verbose_name="닉네임")
     profile = models.IntegerField(default=0, verbose_name="프로필")
     title = models.CharField(max_length=100,null=True,blank=True,verbose_name="칭호")
@@ -30,13 +30,13 @@ class User(AbstractUser):
             ("apple", "Apple"),
             ("kakao", "Kakao"),
             ("google", "Google"),
+            ("email", "Email"),
         ],
-        verbose_name="소셜 로그인 제공자",
+        default="email"
+        #verbose_name="소셜 로그인 제공자"
     )
-    auth_provider_id = models.CharField(max_length=255, verbose_name="소셜 로그인 사용자 ID")
-    auth_provider_email = models.EmailField(
-        unique=True, null=True, blank=True, verbose_name="소셜 로그인 이메일"
-    )
+    #auth_provider_id = models.CharField(max_length=255, verbose_name="소셜 로그인 사용자 ID")
+    auth_provider_email = models.EmailField(unique=True, null=True, blank=True, verbose_name="소셜 로그인 이메일")
     required_consent = models.BooleanField(default=False, verbose_name="필수 약관 동의 여부")
     push_notification_consent = models.BooleanField(default=False, verbose_name="푸시알림 동의 여부")
     marketing_consent = models.BooleanField(default=False, verbose_name="마케팅 정보 수신 동의 여부")
@@ -49,13 +49,14 @@ class User(AbstractUser):
         verbose_name_plural = "사용자"
     
     def save(self, *args, **kwargs):
-        # Title의 첫 번째 레코드를 가져와 기본값으로 설정
-        first_title = Title.objects.first()
-        if first_title:
-            if not self.profile:  # profile이 설정되지 않은 경우
-                self.profile = first_title.emoji  # emoji 값 저장
-            if not self.title:  # title이 설정되지 않은 경우
-                self.title = first_title.name  # name 값 저장
+        if self.auth_provider == "email":
+            self.auth_provider_email = self.email  # ✅ 일반 유저는 auth_provider_email을 자신의 email로 설정
+
+        if self.pk is None:  # 새로운 유저 생성 시에만 실행
+            first_title = Title.objects.first()
+            if first_title:
+                self.profile = self.profile or first_title.emoji  # 기본값 설정
+                self.title = self.title or first_title.name  # 칭호 이름으로 저장하도록 변경
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -78,6 +79,19 @@ class UserDeletion(models.Model):
         related_name='deletions',
         verbose_name="탈퇴한 사용자"
     )
+
+    '''
+    탈퇴한 유저의 기록을 즉시 삭제하지 않을 거라면 이걸로 변경 필요
+    user = models.ForeignKey(
+    'User',
+    null=True,  # 탈퇴 후에도 기록을 남기기 위해 null 허용
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name='deletions',
+    verbose_name="탈퇴한 사용자"
+    )
+
+    '''
     reason = models.IntegerField(
         choices=REASON_CHOICES,
         verbose_name="탈퇴 사유"
@@ -115,7 +129,7 @@ class UserTitle(models.Model):
         related_name="user_titles",  # 역참조 이름
         verbose_name="칭호"
     )
-    is_active = models.BooleanField(default=False, verbose_name="활성화 여부")  # 현재 활성화된 칭호인지
+    #is_active = models.BooleanField(default=False, verbose_name="활성화 여부")  # 현재 활성화된 칭호인지
     acquired_at = models.DateTimeField(default=now, verbose_name="획득 날짜")  # 칭호 획득 날짜
 
     class Meta:
