@@ -93,7 +93,7 @@ class ProfileChoiceView(views.APIView):
         request.user.save()
         return Response({'message': '프로필 이미지 변경 성공'}, status=status.HTTP_200_OK)
 
-# ✅ [마이페이지-내 프로필 편집] 활성화 칭호 중 칭호만 get 해오기 + 선택하기
+# ✅ [마이페이지-내 칭호 편집] 활성화 칭호 중 칭호만 get 해오기 + 선택하기
 class TitleChoiceView(views.APIView):
     permission_classes = [IsAuthenticated]
 

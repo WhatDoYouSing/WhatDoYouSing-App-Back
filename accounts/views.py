@@ -123,26 +123,37 @@ class ChangePasswordView(views.APIView):
 class UserDeleteView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        user = request.user
+        auth_provider = user.auth_provider
+        return Response({"user type":auth_provider})
+
     def post(self, request):
-        serializer = UserDeleteSerializer(data=request.data)
+        serializer = UserDeleteSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         user = request.user
-        password = serializer.validated_data["password"]
+        auth_provider = user.auth_provider 
         reason = serializer.validated_data["reason"]
         custom_reason = serializer.validated_data.get("custom_reason", "")
 
-        if not user.check_password(password):
-            return Response({"message": "비밀번호가 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if auth_provider == "email":
+            password = serializer.validated_data["password"]
+            if not user.check_password(password):
+                return Response({"message": "비밀번호가 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-        UserDeletion.objects.create(
+        user_deletion = UserDeletion.objects.create(
             user=user,
             reason=reason,
             custom_reason=custom_reason if reason == 7 else "",
             deleted_at=now()
         )
 
+        user_deletion.user = None
+        user_deletion.save()
+
         user.delete()
+
         return Response({"message": "회원 탈퇴 성공"}, status=status.HTTP_200_OK)
 
 # 일반 유저 ############################################################################################
@@ -193,16 +204,6 @@ class SocialSignUpCompleteView(views.APIView):
             return Response({'message': '소셜 회원가입 설정 완료', 'data': serializer.data}, status=status.HTTP_200_OK)
 
         return Response({'message': '설정 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
-# ✅ [소셜] 계정 삭제
-class SocialUserDeleteView(views.APIView):
-    permission_classes = [IsAuthenticated]
-
-    def delete(self, request):
-        """소셜 계정 삭제"""
-        user = request.user
-        user.delete()
-        return Response({"message": "계정 삭제 성공"}, status=status.HTTP_204_NO_CONTENT)
 
 # 카카오 유저 ############################################################################################
 

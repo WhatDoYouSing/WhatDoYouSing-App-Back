@@ -16,7 +16,6 @@ urlpatterns = [
     
     # ✅ [소셜] 회원가입 & 로그인 관련
     path('social/signup/', SocialSignUpCompleteView.as_view()),  # 소셜 회원가입 설정 완료
-    path('social/delete/', SocialUserDeleteView.as_view()),  # 소셜 계정 삭제
 
     # ✅ [카카오] OAuth 로그인 & 회원가입
     path('kakao/', KakaoLoginView.as_view()),  # 카카오 로그인 페이지 이동

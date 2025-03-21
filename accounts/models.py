@@ -70,28 +70,18 @@ class UserDeletion(models.Model):
         (4, "원하는 기능이 없어서"),
         (5, "호기심에 설치한 앱이어서"),
         (6, "앱을 사용할 시간이 없어서"),
-        (7, "기타"),  # "기 선택지 추가
+        (7, "기타"),
     ]
     # 탈퇴한 사용자 ID (외래키: User 모델 참조)
     user = models.ForeignKey(
         'User',  # User 모델 참조
-        on_delete=models.CASCADE,  # User 삭제 시 관련 기록도 삭제
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,  # User 삭제 시 해당 필드만 null이 되도록
         related_name='deletions',
         verbose_name="탈퇴한 사용자"
     )
 
-    '''
-    탈퇴한 유저의 기록을 즉시 삭제하지 않을 거라면 이걸로 변경 필요
-    user = models.ForeignKey(
-    'User',
-    null=True,  # 탈퇴 후에도 기록을 남기기 위해 null 허용
-    blank=True,
-    on_delete=models.SET_NULL,
-    related_name='deletions',
-    verbose_name="탈퇴한 사용자"
-    )
-
-    '''
     reason = models.IntegerField(
         choices=REASON_CHOICES,
         verbose_name="탈퇴 사유"
@@ -111,10 +101,8 @@ class UserDeletion(models.Model):
         verbose_name_plural = "사용자 탈퇴 기록"
 
     def __str__(self):
-        # "기타" 사유가 있는 경우, 상세 내용 표시
-        if self.reason == 7 and self.custom_reason:
-            return f"탈퇴 기록: {self.user.username} - 기타 사유: {self.custom_reason}"
-        return f"탈퇴 기록: {self.user.username} - {self.get_reason_display()}"
+        user_str = self.user.username if self.user else "탈퇴한 유저"
+        return f"{user_str} (사유: {self.reason})"
 
 class UserTitle(models.Model):
     user = models.ForeignKey(

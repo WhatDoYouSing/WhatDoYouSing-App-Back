@@ -8,5 +8,6 @@ urlpatterns = [
     path('update/title/', TitleChoiceView.as_view()),
     path('update/profile/', ProfileChoiceView.as_view()),
     path('update/nickname/', NicknameUpdateView.as_view()),
+    
     path('calendar/', MyCalendarView.as_view()),
 ]
