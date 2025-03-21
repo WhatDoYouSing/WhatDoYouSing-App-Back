@@ -226,6 +226,7 @@ class NoteReply(models.Model):
         verbose_name="대댓글 작성자",
         related_name="note_replies"  
     )
+    mention = models.CharField(max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True)
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
@@ -286,6 +287,7 @@ class PliReply(models.Model):
         verbose_name="대댓글 작성자",
         related_name="pli_replies" 
     )
+    mention = models.CharField(max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True)
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
