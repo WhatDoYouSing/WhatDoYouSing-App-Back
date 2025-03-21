@@ -72,7 +72,7 @@ class PlaylistDetailView(APIView):
             serialized_comments = [{
                 "user": {
                     "id": comment.user.id,
-                    "username": comment.user.username,
+                    "username": comment.user.serviceID,
                     "nickname": comment.user.nickname,
                     "profile": comment.user.profile
                 },
@@ -94,7 +94,7 @@ class PlaylistDetailView(APIView):
             "title": pli.title,
             "user": {
                 "id": pli.user.id,
-                "username": pli.user.username,
+                "username": pli.user.serviceID,
                 "nickname": pli.user.nickname,
                 "profile": pli.user.profile
             },
@@ -214,7 +214,7 @@ class PliCommentListView(APIView):
                 "id": reply.id,
                 "user": {
                     "id": reply.user.id,
-                    "username": reply.user.username,
+                    "username": reply.user.serviceID,
                     "nickname": reply.user.nickname,
                     "profile": reply.user.profile
                 },
@@ -229,7 +229,7 @@ class PliCommentListView(APIView):
                 "id": comment.id,
                 "user": {
                     "id": comment.user.id,
-                    "username": comment.user.username,
+                    "username": comment.user.serviceID,
                     "nickname": comment.user.nickname,
                     "profile": comment.user.profile
                 },

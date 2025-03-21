@@ -12,7 +12,7 @@ class NoteReplySerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         return {
             "id": obj.user.id,
-            "username": obj.user.username,
+            "username": obj.user.serviceID,
             "nickname": obj.user.nickname,
             "profile": obj.user.profile
         }
@@ -34,7 +34,7 @@ class NoteCommentSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         return {
             "id": obj.user.id,
-            "username": obj.user.username,
+            "username": obj.user.serviceID,
             "nickname": obj.user.nickname,
             "profile": obj.user.profile
         }

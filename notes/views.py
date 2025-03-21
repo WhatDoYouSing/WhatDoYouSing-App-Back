@@ -88,7 +88,7 @@ class NoteDetailView(APIView):
             "id": note.id,
             "user": {
                 "id": note.user.id,
-                "username": note.user.username,
+                "username": note.user.serviceID,
                 "nickname": note.user.nickname,
                 "profile": note.user.profile
             },
@@ -114,7 +114,7 @@ class NoteDetailView(APIView):
                 {
                     "user": {
                         "id": c.user.id,
-                        "username": c.user.username,
+                        "username": c.user.serviceID,
                         "nickname": c.user.nickname,
                         "profile": c.user.profile
                     },
@@ -334,7 +334,7 @@ class NoteCommentListView(APIView):
                 "id": reply.id,
                 "user": {
                     "id": reply.user.id,
-                    "username": reply.user.username,
+                    "username": reply.user.serviceID,
                     "nickname": reply.user.nickname,
                     "profile": reply.user.profile
                 },
@@ -349,7 +349,7 @@ class NoteCommentListView(APIView):
                 "id": comment.id,
                 "user": {
                     "id": comment.user.id,
-                    "username": comment.user.username,
+                    "username": comment.user.serviceID,
                     "nickname": comment.user.nickname,
                     "profile": comment.user.profile
                 },
