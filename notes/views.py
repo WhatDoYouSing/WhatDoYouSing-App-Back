@@ -121,7 +121,8 @@ class NoteDetailView(APIView):
                     "created_at": c.created_at.strftime('%Y-%m-%d %H:%M'),
                     "content": c.content,
                     "reply_count": c.replies.count(),
-                    "likes_count": c.likes.count()
+                    "likes_count": c.likes.count(),
+                    "mine": c.user == user 
                 }
                 for c in comments[:1]  # 최근 1개만 반환
             ],
@@ -285,19 +286,20 @@ class NoteCommentView(APIView):
             return Response({"error": "댓글 내용을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
 
         if comment_id:
-            # ✅ 대댓글 작성
+            # 대댓글 작성
             parent_comment = get_object_or_404(NoteComment, id=comment_id, note=note)
             reply = NoteReply.objects.create(
                 comment=parent_comment,
                 user=user,
-                content=content
+                content=content,
+                mention=request.data.get("mention")
             )
             return Response(
                 {"message": "대댓글이 등록되었습니다.", "data": NoteReplySerializer(reply).data},
                 status=status.HTTP_201_CREATED
             )
         else:
-            # ✅ 일반 댓글 작성
+            # 일반 댓글 작성
             comment = NoteComment.objects.create(
                 note=note,
                 user=user,
@@ -321,7 +323,7 @@ class NoteCommentListView(APIView):
         scrap_count = ScrapNotes.objects.filter(content_id=note_id).count()
 
         # 부모 댓글 (최상위 댓글) 가져오기
-        comments = NoteComment.objects.filter(note=note).order_by('-created_at')
+        comments = NoteComment.objects.filter(note=note).order_by('created_at')
 
         # 댓글 직렬화
         serialized_comments = []
