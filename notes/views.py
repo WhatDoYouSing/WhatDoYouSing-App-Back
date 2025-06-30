@@ -11,6 +11,7 @@ from django.db.models import Q
 from home.serializers import *
 from django.db.models import F
 from .serializers import *
+from django.db.models import Count
 
 class NoteDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -24,9 +25,10 @@ class NoteDetailView(APIView):
 
         # 감정 개수 가져오기
         emotion_counts = (
-            Emotions.objects.filter(
-                id__in=NoteEmotion.objects.filter(note=note).values_list('emotion', flat=True)
-            ).values('name', 'count')  
+            NoteEmotion.objects
+                .filter(note=note)
+                .values('emotion__name')
+                .annotate(count=Count('id'))
         )
 
         # 태그 가져오기
@@ -113,7 +115,7 @@ class NoteDetailView(APIView):
             "location_name": note.location_name,
             "location_address": note.location_address,
             "emotions": [
-                {"emotion": e['name'], "count": e['count']} for e in emotion_counts
+                {"emotion": e['emotion__name'], "count": e['count']} for e in emotion_counts
             ],
             "comment_count": comments.count(),
             "scrap_count": ScrapNotes.objects.filter(content_id=note.id).count(),
@@ -440,3 +442,52 @@ class NoteReplyEditDeleteView(APIView):
         reply.save()
 
         return Response({"message": "대댓글이 수정되었습니다."}, status=status.HTTP_200_OK)
+
+class ReportCommentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, content_type, comment_type, content_id):
+        user = request.user
+        reason = request.data.get("reason", "").strip()
+        if not reason:
+            return Response(
+                {"message": "신고 사유를 입력해주세요."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        model = None
+        report_type = None
+
+        if content_type == "note":
+            if comment_type == "comment":
+                model = NoteComment
+                report_type = "note comment"
+            elif comment_type == "reply":
+                model = NoteReply
+                report_type = "note reply"
+        elif content_type == "pli":
+            if comment_type == "comment":
+                model = PliComment
+                report_type = "playlist comment"
+            elif comment_type == "reply":
+                model = PliReply
+                report_type = "playlist reply"
+
+
+        # 대상 가져오기
+        target = get_object_or_404(model, id=content_id)
+
+        # 신고 생성
+        CommentReport.objects.create(
+            report_user=user,
+            issue_user=target.user,
+            content=target.content,
+            reason=reason,
+            type=report_type,
+            content_id=target.id
+        )
+
+        return Response(
+            {"message": f"{report_type}이(가) 신고되었습니다."},
+            status=status.HTTP_201_CREATED
+        )

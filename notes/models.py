@@ -303,3 +303,35 @@ class PliReply(models.Model):
 
     def __str__(self):
         return f"대댓글: {self.user.username} - {self.content[:20]}"
+
+class CommentReport(models.Model):
+    REPORT_TYPE_CHOICES = [
+        ("note comment", "note comment"),  
+        ("note reply", "note reply"),  
+        ("playlist comment", "playlist comment"),
+        ("playlist reply", "playlist reply"),
+    ]
+    report_user = models.ForeignKey(
+        User,
+        verbose_name="신고 유저",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="reports_made",
+    )
+    issue_user = models.ForeignKey(
+        User,
+        verbose_name="위험 유저",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="reports_received",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    content = models.TextField(verbose_name="댓글/대댓글 내용")
+    reason = models.TextField(verbose_name="신고 사유")
+    type = models.CharField(
+        max_length=20, choices=REPORT_TYPE_CHOICES, default="note comment"
+    )
+    content_id = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.report_user} -> {self.issue_user} ({self.type})"

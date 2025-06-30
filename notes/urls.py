@@ -15,6 +15,7 @@ urlpatterns = [
     path("comments/edit/<int:comment_id>/", NoteCommentEditDeleteView.as_view()),
     path("reply/delete/<int:reply_id>/", NoteReplyEditDeleteView.as_view()),
     path("reply/edit/<int:reply_id>/", NoteReplyEditDeleteView.as_view()),
+    path("comments/report/<str:content_type>/<str:comment_type>/<int:content_id>/", ReportCommentView.as_view()),
 
 
 ]
