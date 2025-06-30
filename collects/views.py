@@ -22,15 +22,18 @@ class CollectView(APIView):
 
         if type == 'note':
             # 노트 보관
-
-            if ScrapNotes.objects.filter(scrap_list=scrap_list, content_id=content_id).exists():
+            
+            sn = ScrapNotes.objects.filter(scrap_list=scrap_list, content_id=content_id)
+            if sn.exists():
+                # 이미 존재하면 삭제
+                sn.delete()
                 return Response({
-                    "message": "이 노트는 이미 보관되었습니다."
-                }, status=status.HTTP_409_CONFLICT)  # 이미 존재하는 경우
+                    "message": "노트를 스크랩 리스트에서 제거했습니다."
+                }, status=status.HTTP_200_OK)
 
             note = get_object_or_404(Notes, id=content_id)
             # ScrapNotes 객체 생성
-            scrap_note = ScrapNotes.objects.create(
+            ScrapNotes.objects.create(
                 scrap_list=scrap_list,
                 content_id=note.id
             )
@@ -40,14 +43,16 @@ class CollectView(APIView):
        
         elif type == 'pli':
             # 플리 보관
-            if ScrapPlaylists.objects.filter(scrap_list=scrap_list, content_id=content_id).exists():
+            sp = ScrapPlaylists.objects.filter(scrap_list=scrap_list, content_id=content_id)
+            if sp.exists():
+                sp.delete()
                 return Response({
-                    "message": "이 플리는 이미 보관되었습니다."
-                }, status=status.HTTP_409_CONFLICT)  # 이미 존재하는 경우
+                    "message":"플레이리스트를 스크랩 리스트에서 제거했습니다."
+                }, status=status.HTTP_200_OK)
 
             pli = get_object_or_404(Plis, id=content_id)
             # ScrapPlaylists 객체 생성
-            scrap_pli = ScrapPlaylists.objects.create(
+            ScrapPlaylists.objects.create(
                 scrap_list=scrap_list,
                 content_id=pli.id
             )
@@ -106,6 +111,75 @@ class ScrapListView(APIView):
                 "name": scrap_list.name,
                 "album_art": album_arts,  # 최대 4개의 앨범 아트를 저장할 리스트
                 "subtitle": subtitle
+            }
+
+            # 최종적으로 보관함 데이터를 리스트에 추가
+            scrap_list_data.append(scrap_list_info)
+
+        return Response({
+            "message": "보관함 조회 성공",
+            "data": scrap_list_data
+        }, status=status.HTTP_200_OK)
+
+class ScrapListCheckView(APIView):
+    permission_classes = [IsAuthenticated]  
+
+    def get(self, request, type, content_id):
+        user = request.user
+
+        # 사용자 스크랩 리스트 조회
+        scrap_lists = ScrapList.objects.filter(user=user)
+
+        # 반환할 데이터
+        scrap_list_data = []
+
+        for scrap_list in scrap_lists:
+            # 노트 스크랩 조회
+            scrap_notes = ScrapNotes.objects.filter(scrap_list=scrap_list)
+            scrap_playlists = ScrapPlaylists.objects.filter(scrap_list=scrap_list)
+
+            # 노트 제목과 가수 구성
+            note_count = scrap_notes.count()
+            pli_count = scrap_playlists.count()
+
+            # subtitle 동적 생성 (노트 또는 플리가 0개일 경우 표시하지 않음)
+            subtitle_parts = []
+            if note_count > 0:
+                subtitle_parts.append(f"노트 {note_count}")
+            if pli_count > 0:
+                subtitle_parts.append(f"플리 {pli_count}")
+            subtitle = " · ".join(subtitle_parts) if subtitle_parts else None
+
+            # 최대 4개의 앨범 아트 가져오기
+            album_arts = []
+            note_ids = scrap_notes.values_list('content_id', flat=True)  # content_id 가져오기
+            notes = Notes.objects.filter(id__in=note_ids)  # Notes에서 조회
+
+            for note in notes:
+                if note.album_art:
+                    album_arts.append(note.album_art)
+                if len(album_arts) >= 4:  # 최대 4개까지만
+                    break
+
+            # collect 여부 확인
+            if type == 'note':
+                is_collected = ScrapNotes.objects.filter(scrap_list=scrap_list, content_id=content_id).exists()
+            elif type == 'pli':
+                is_collected = ScrapPlaylists.objects.filter(scrap_list=scrap_list, content_id=content_id).exists()
+            else:
+                return Response(
+                    {"message": "유효하지 않은 type입니다. 'note' 또는 'pli'만 가능합니다."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+
+            # 보관함 정보
+            scrap_list_info = {
+                "id": scrap_list.id,
+                "name": scrap_list.name,
+                "album_art": album_arts,  # 최대 4개의 앨범 아트를 저장할 리스트
+                "subtitle": subtitle,
+                "collect": is_collected
             }
 
             # 최종적으로 보관함 데이터를 리스트에 추가

@@ -20,11 +20,12 @@ class PlaylistDetailView(APIView):
         user = request.user
         pli = get_object_or_404(Plis, id=pk)
         pli_owner = pli.user
-
         # 친구 여부 확인
-        is_friend = UserFollows.objects.filter(
-            Q(follower=user, following=pli_owner) & Q(follower=pli_owner, following=user)
-        ).exists()
+        is_friend = (
+            UserFollows.objects.filter(follower=user, following=pli_owner).exists()
+            and
+            UserFollows.objects.filter(follower=pli_owner, following=user).exists()
+        )
 
         # 접근 권한 체크 (본인/친구/타인)
         if pli_owner == user or pli.visibility == "public" or (is_friend and pli.visibility == "friends"):
@@ -87,6 +88,14 @@ class PlaylistDetailView(APIView):
         same_user_plis = Plis.objects.filter(user=pli_owner).exclude(id=pli.id)[:2]
         serialized_same_user_plis = PliSerializer(same_user_plis, many=True)
 
+        is_mine = (pli.user == user)
+
+        # is_collected: 내가 보관했는지
+        is_collected = ScrapPlaylists.objects.filter(
+            scrap_list__user=user,
+            content_id=pli.id
+        ).exists()
+
 
         # 최종 데이터 구성
         pli_data = {
@@ -98,6 +107,8 @@ class PlaylistDetailView(APIView):
                 "nickname": pli.user.nickname,
                 "profile": pli.user.profile
             },
+            "mine": is_mine,
+            "is_collected": is_collected,
             "created_at": pli.created_at.strftime('%Y-%m-%d %H:%M'),
             "is_updated": pli.is_updated,
             "visibility": pli.visibility,
@@ -124,10 +135,11 @@ class SameUserPliView(APIView):
         user = request.user
 
         # 친구 관계 확인 (서로 팔로우한 경우)
-        is_friend = UserFollows.objects.filter(
-            Q(follower=user, following=user_owner) &
-            Q(follower=user_owner, following=user)
-        ).exists()
+        is_friend = (
+            UserFollows.objects.filter(follower=user, following=user_owner).exists()
+            and
+            UserFollows.objects.filter(follower=user_owner, following=user).exists()
+        )
 
         # 사용자 유형별 필터링
         if user_id == user.id:
