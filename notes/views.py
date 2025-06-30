@@ -11,6 +11,7 @@ from django.db.models import Q
 from home.serializers import *
 from django.db.models import F
 from .serializers import *
+from django.db.models import Count
 
 class NoteDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -24,9 +25,10 @@ class NoteDetailView(APIView):
 
         # 감정 개수 가져오기
         emotion_counts = (
-            Emotions.objects.filter(
-                id__in=NoteEmotion.objects.filter(note=note).values_list('emotion', flat=True)
-            ).values('name', 'count')  
+            NoteEmotion.objects
+                .filter(note=note)
+                .values('emotion__name')
+                .annotate(count=Count('id'))
         )
 
         # 태그 가져오기
@@ -113,7 +115,7 @@ class NoteDetailView(APIView):
             "location_name": note.location_name,
             "location_address": note.location_address,
             "emotions": [
-                {"emotion": e['name'], "count": e['count']} for e in emotion_counts
+                {"emotion": e['emotion__name'], "count": e['count']} for e in emotion_counts
             ],
             "comment_count": comments.count(),
             "scrap_count": ScrapNotes.objects.filter(content_id=note.id).count(),
