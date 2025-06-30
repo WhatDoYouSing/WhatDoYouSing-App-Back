@@ -33,7 +33,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 #SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
-DEBUG = env('DEBUG')
+# DEBUG = env('DEBUG')
 KAKAO_CLIENT_ID = env('KAKAO_CLIENT_ID')
 KAKAO_APP_ID = env('KAKAO_APP_ID')
 KAKAO_CLIENT_SECRET_KEY = env('KAKAO_CLIENT_SECRET_KEY')
@@ -214,6 +214,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

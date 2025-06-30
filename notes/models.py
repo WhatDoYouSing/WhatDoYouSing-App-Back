@@ -94,8 +94,8 @@ class Notes(models.Model):
     # archive_count = models.IntegerField(default=0)  # 보관 수
 
     def __str__(self):
-        return self.song_title
-    
+        return f"{self.id}. {self.user.nickname} - {self.song_title} ({self.visibility})"
+
 # 노트에 다른 사용자가 감정 등록
 class NoteEmotion(models.Model):
     note = models.ForeignKey(
