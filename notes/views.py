@@ -34,9 +34,14 @@ class NoteDetailView(APIView):
                list(note.tag_season.values_list("name", flat=True)) + \
                list(note.tag_context.values_list("name", flat=True))
         
-        # 맞팔 확인
-        user_owner = note.user
         user = request.user
+        is_mine = (note.user == user)
+
+        # is_collected: 내가 보관했는지
+        is_collected = ScrapNotes.objects.filter(
+            scrap_list__user=user,
+            content_id=note.id
+        ).exists()
         
         friends = UserFollows.objects.filter(
             Q(follower=user) & 
@@ -92,6 +97,8 @@ class NoteDetailView(APIView):
                 "nickname": note.user.nickname,
                 "profile": note.user.profile
             },
+            "mine": is_mine,
+            "is_collected": is_collected,
             "created_at": note.created_at.strftime('%Y-%m-%d %H:%M'),
             "is_updated": note.is_updated,
             "visibility": note.visibility,
@@ -178,10 +185,11 @@ class SameUserContentsView(APIView):
         user = request.user
 
         # 친구 관계 확인 (서로 팔로우한 경우)
-        is_friend = UserFollows.objects.filter(
-            Q(follower=user, following=user_owner) &
-            Q(follower=user_owner, following=user)
-        ).exists()
+        is_friend = (
+                UserFollows.objects.filter(follower=user, following=user_owner).exists()
+                and
+                UserFollows.objects.filter(follower=user_owner, following=user).exists()
+            )
 
         # 사용자 유형별 필터링
         if user_id == user.id:
