@@ -20,4 +20,8 @@ urlpatterns = [
     # ✅ [카카오] OAuth 로그인 & 회원가입
     path('kakao/', KakaoLoginView.as_view()),  # 카카오 로그인 페이지 이동
     path('kakao/callback/', KakaoCallbackView.as_view()),  # 카카오 로그인 콜백
+
+    # 📌 [일반] 이메일 인증
+    path('verify-email/', RequestEmailVerificationView.as_view()),
+    path('verify-email/<uidb64>/<token>/', VerifyEmailView.as_view(), name='verify_email'),
 ]
