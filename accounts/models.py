@@ -22,8 +22,9 @@ class User(AbstractUser):
     notif_token = models.TextField(null=True, blank=True, verbose_name="FCM 토큰")
     nickname = models.CharField(max_length=50, verbose_name="닉네임")
     profile = models.IntegerField(default=0, verbose_name="프로필")
-    title = models.CharField(max_length=100,null=True,blank=True,verbose_name="칭호")
-    # 소셜 로그인 제공자 선택 (애플, 카카오, 구글)
+    title_selection = models.ForeignKey(Title, on_delete=models.CASCADE, verbose_name="현재 칭호", null=True, blank=True)
+
+    # 소셜 로그인 제공자 선택 (애플, 카카오, 구글)s
     auth_provider = models.CharField(
         max_length=50,
         choices=[
@@ -35,7 +36,6 @@ class User(AbstractUser):
         default="email"
         #verbose_name="소셜 로그인 제공자"
     )
-    #auth_provider_id = models.CharField(max_length=255, verbose_name="소셜 로그인 사용자 ID")
     auth_provider_email = models.EmailField(unique=True, null=True, blank=True, verbose_name="소셜 로그인 이메일")
     required_consent = models.BooleanField(default=False, verbose_name="필수 약관 동의 여부")
     push_notification_consent = models.BooleanField(default=False, verbose_name="푸시알림 동의 여부")
@@ -48,15 +48,25 @@ class User(AbstractUser):
         verbose_name = "사용자"
         verbose_name_plural = "사용자"
     
+    '''
     def save(self, *args, **kwargs):
-        if self.auth_provider == "email":
-            self.auth_provider_email = self.email  # ✅ 일반 유저는 auth_provider_email을 자신의 email로 설정
+        #if self.auth_provider == "email":
+        #    self.auth_provider_email = self.email  # 일반 유저는 auth_provider_email을 자신의 email로 설정
 
         if self.pk is None:  # 새로운 유저 생성 시에만 실행
             first_title = Title.objects.first()
             if first_title:
                 self.profile = self.profile or first_title.emoji  # 기본값 설정
-                self.title = self.title or first_title.name  # 칭호 이름으로 저장하도록 변경
+                #self.title = self.title or first_title.name  # 칭호 이름으로 저장하도록 변경
+        super().save(*args, **kwargs)
+    '''
+
+    def save(self, *args, **kwargs):
+        if self.pk is None:  # 새로운 유저 생성 시
+            blank_title = Title.objects.get(name="blank")
+            UserTitle.objects.get_or_create(user=self, title=blank_title)
+            self.title_selection = blank_title
+            self.profile = self.profile or blank_title.emoji 
         super().save(*args, **kwargs)
 
     def __str__(self):

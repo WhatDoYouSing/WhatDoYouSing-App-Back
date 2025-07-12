@@ -112,7 +112,7 @@ class TitleChoiceView(views.APIView):
             if not UserTitle.objects.filter(user=request.user, title=new_title).exists():
                 return Response({'message': '해당 칭호가 활성화되지 않았습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            request.user.title = new_title.name
+            request.user.title_selection = new_title
             request.user.save()
             return Response({'message': '칭호 변경 성공'}, status=status.HTTP_200_OK)
 

@@ -29,29 +29,21 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-#SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
-
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 # DEBUG = env('DEBUG')
 KAKAO_CLIENT_ID = env('KAKAO_CLIENT_ID')
 KAKAO_APP_ID = env('KAKAO_APP_ID')
 KAKAO_CLIENT_SECRET_KEY = env('KAKAO_CLIENT_SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = True
-
-############# env 가져와야함 !!!!!!!!!!!
-#EMAIL_BACKEND = env('EMAIL_BACKEND')
-#EMAIL_HOST = env('EMAIL_HOST')
-#EMAIL_PORT = env('EMAIL_PORT')
-#EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-#EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-#EMAIL_USE_TLS = True
-#DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_BACKEND = env('EMAIL_BACKEND')
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env('EMAIL_PORT')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -121,6 +113,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     #'django.middleware.common.CommonMiddleware', # 추가
     'allauth.account.middleware.AccountMiddleware', # 추가
+]
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
 # cors 

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializers import *
 from rest_framework import generics
+from accounts.tokens import EmailVerificationTokenGenerator
 
 from dj_rest_auth.registration.views import SocialLoginView                 
 from allauth.socialaccount.providers.kakao import views as kakao_views     
@@ -12,12 +13,20 @@ from allauth.socialaccount.providers.kakao.views import KakaoOAuth2Adapter
 from rest_framework.permissions import AllowAny
 from django.shortcuts import redirect
 
+from django.conf import settings
+from django.core.mail import send_mail
+from django.http import JsonResponse
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+
+import hashlib
+import base64
 import WDYS
 import requests
 import allauth
 import string
 
-#BASE_URL = 'http://127.0.0.1:8000/'
 BASE_URL = 'http://localhost:8000/'
 
 KAKAO_CONFIG = {
@@ -85,7 +94,7 @@ class ChangeServiceIDView(views.APIView):
         return Response(serializer.data)
 
     def patch(self, request):
-        if not request.data:  # 📌 입력 데이터가 비어있으면 에러 반환
+        if not request.data: 
             return Response({'message': '입력이 없습니다'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = self.serializer_class(request.user, data=request.data, partial=True)
@@ -158,6 +167,65 @@ class UserDeleteView(views.APIView):
 
 # 일반 유저 ############################################################################################
 
+# ✅ [일반] 가입 약관 동의
+class ConsentView(views.APIView):
+    def post(self, request):
+        
+        serializer = ConsentSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
+        return Response({'error': serializer.errors}, status=400)
+
+# ✅ [일반] 이메일 인증 요청 (최종)
+class RequestEmailVerificationView(views.APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "이메일은 필수입니다."}, status=400)
+
+        # 이미 존재하는 유저가 있다면 거부해도 됨
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "이미 가입된 이메일입니다."}, status=400)
+
+        # 토큰 생성
+        token = EmailVerificationTokenGenerator().make_token(email)
+        uid = urlsafe_base64_encode(force_bytes(email))
+
+        verification_link = request.build_absolute_uri(
+            reverse("verify_email", kwargs={"uidb64": uid, "token": token})
+        )
+
+        subject = "🎵 WhatDoYouSing - 이메일 인증을 완료해주세요!"
+        message = f"안녕하세요!\n\n아래 링크를 클릭하여 이메일 인증을 완료해주세요:\n\n{verification_link}\n\n감사합니다!"
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False,
+        )
+
+        return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
+    
+# ✅ [일반] 이메일 인증
+class VerifyEmailView(views.APIView):
+    def get(self, request, uidb64, token):
+        try:
+            email = force_str(urlsafe_base64_decode(uidb64))
+        except (ValueError, TypeError, OverflowError):
+            return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 토큰 확인
+        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
+        if not token_valid:
+            return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 프론트에서 이 이메일로 본가입 진행하도록 안내
+        return Response({
+            'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
+            'email': email
+        }, status=status.HTTP_200_OK)
+
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
     permission_classes = [AllowAny]
@@ -167,8 +235,9 @@ class GeneralSignUpView(views.APIView):
         serializer = self.serializer_class(data=request.data)
 
         if serializer.is_valid():
-            serializer.save()
-            return Response({'message': '회원가입 성공', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            user = serializer.save()
+            self.send_verification(request,user)
+            return Response({'message': '회원가입 성공! 이메일 인증 메일 확인 시 계정이 활성화 됩니다', 'data': serializer.data}, status=status.HTTP_201_CREATED)
         return Response({'message': '회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 # ✅ [일반] 로그인
@@ -199,7 +268,7 @@ class SocialSignUpCompleteView(views.APIView):
         # 소셜 회원가입 정보 업데이트
         serializer = SocialSignUpSerializer(instance=user, data=request.data, partial=True)
 
-        if serializer.is_valid():
+        if serializer.is_valid(): 
             serializer.save()
             return Response({'message': '소셜 회원가입 설정 완료', 'data': serializer.data}, status=status.HTTP_200_OK)
 
