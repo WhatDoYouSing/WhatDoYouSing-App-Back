@@ -47,26 +47,13 @@ class User(AbstractUser):
         db_table = "users"
         verbose_name = "사용자"
         verbose_name_plural = "사용자"
-    
-    '''
-    def save(self, *args, **kwargs):
-        #if self.auth_provider == "email":
-        #    self.auth_provider_email = self.email  # 일반 유저는 auth_provider_email을 자신의 email로 설정
-
-        if self.pk is None:  # 새로운 유저 생성 시에만 실행
-            first_title = Title.objects.first()
-            if first_title:
-                self.profile = self.profile or first_title.emoji  # 기본값 설정
-                #self.title = self.title or first_title.name  # 칭호 이름으로 저장하도록 변경
-        super().save(*args, **kwargs)
-    '''
 
     def save(self, *args, **kwargs):
         if self.pk is None:  # 새로운 유저 생성 시
             blank_title = Title.objects.get(name="blank")
             UserTitle.objects.get_or_create(user=self, title=blank_title)
             self.title_selection = blank_title
-            self.profile = self.profile or blank_title.emoji 
+            self.profile = self.profile or blank_title.emoji
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -127,7 +114,6 @@ class UserTitle(models.Model):
         related_name="user_titles",  # 역참조 이름
         verbose_name="칭호"
     )
-    #is_active = models.BooleanField(default=False, verbose_name="활성화 여부")  # 현재 활성화된 칭호인지
     acquired_at = models.DateTimeField(default=now, verbose_name="획득 날짜")  # 칭호 획득 날짜
 
     class Meta:
