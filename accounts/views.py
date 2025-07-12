@@ -15,10 +15,12 @@ from django.shortcuts import redirect
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
+from django.template.loader import render_to_string
 
 import hashlib
 import base64
@@ -170,7 +172,7 @@ class UserDeleteView(views.APIView):
 # ✅ [일반] 가입 약관 동의
 class ConsentView(views.APIView):
     def post(self, request):
-        
+
         serializer = ConsentSerializer(data=request.data)
         if serializer.is_valid():
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
@@ -196,14 +198,19 @@ class RequestEmailVerificationView(views.APIView):
         )
 
         subject = "🎵 WhatDoYouSing - 이메일 인증을 완료해주세요!"
-        message = f"안녕하세요!\n\n아래 링크를 클릭하여 이메일 인증을 완료해주세요:\n\n{verification_link}\n\n감사합니다!"
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [email],
-            fail_silently=False,
+        
+        html_content = render_to_string("email.html", {
+            "verification_link": verification_link,
+        })
+
+        email_message = EmailMultiAlternatives(
+            subject=subject,
+            body="HTML 지원되지 않는 클라이언트를 위한 텍스트 버전입니다.",  # fallback
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
         )
+        email_message.attach_alternative(html_content, "text/html")
+        email_message.send()
 
         return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
     
@@ -358,3 +365,5 @@ class KakaoCallbackView(views.APIView):
                 if serializer1.is_valid():
                     return Response({'message':'카카오 회원가입 성공','data':serializer1.validated_data}, status=status.HTTP_201_CREATED)
             return Response({'message':'카카오 회원가입 실패','error':serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+        
+# 구글 유저 ############################################################################################        
