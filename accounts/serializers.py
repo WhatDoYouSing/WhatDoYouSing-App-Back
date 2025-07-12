@@ -8,12 +8,6 @@ User = get_user_model()
 
 # 일반/소셜 공통, 유저 관리 ############################################################################################
 
-# ✅ 칭호 Serializer (User의 ForeignKey 반영)
-#class TitleSerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = Title
-#        fields = ['id', 'name', 'emoji']
-
 # ✅ 회원가입 공통 부모 Serializer
 class AbstractSignupSerializer(serializers.ModelSerializer):
     """일반 및 소셜 회원가입 공통 필드"""
@@ -79,8 +73,6 @@ class RandomNicknameSerializer(serializers.Serializer):
             if len(nickname) <= 9:
                 return nickname
         return nickname[:9]  # 9자 이하 유지
-    
-# 📌 유저 닉네임 변경 Serializer
 
 # ✅ 유저 아이디 변경 Serializer
 class ServiceIDUpdateSerializer(serializers.ModelSerializer):
@@ -112,17 +104,20 @@ class UserDeleteSerializer(serializers.Serializer):
         if user.auth_provider == "email" and "password" not in data:
             raise serializers.ValidationError({"password": "일반 회원은 비밀번호를 입력해야 합니다."})
 
-        return data 
-
-# ✅ 유저 칭호 관리 Serializer
-#class UserTitleSerializer(serializers.ModelSerializer):
-#    title = TitleSerializer(read_only=True)
-
-#    class Meta:
-#        model = UserTitle
-#        fields = ['user', 'title', 'is_active', 'acquired_at']    
+        return data  
 
 # 일반 유저 ############################################################################################
+
+# ✅ 일반 회원가입 약관 동의 Serializer
+class ConsentSerializer(serializers.Serializer):
+    required_consent = serializers.BooleanField()
+    push_notification_consent = serializers.BooleanField(default=False)
+    marketing_consent = serializers.BooleanField(default=False)
+
+    def validate_required_consent(self, value):
+        if not value:
+            raise serializers.ValidationError("필수 약관에 동의해야 회원가입을 진행할 수 있습니다.")
+        return value
 
 # ✅ 일반 회원가입 Serializer
 class GeneralSignUpSerializer(AbstractSignupSerializer):

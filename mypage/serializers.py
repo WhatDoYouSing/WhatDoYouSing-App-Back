@@ -77,8 +77,7 @@ class ActiveUserTitleSerializer(serializers.ModelSerializer):
 class UserTitleUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['title']
-
+        fields = ['title_selection']
 
 # ✅ 유저 획득 이모지(프로필) Serializer
 class ActiveUserProfileSerializer(serializers.ModelSerializer):

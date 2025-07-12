@@ -27,7 +27,6 @@ import requests
 import allauth
 import string
 
-#BASE_URL = 'http://127.0.0.1:8000/'
 BASE_URL = 'http://localhost:8000/'
 
 KAKAO_CONFIG = {
@@ -95,7 +94,7 @@ class ChangeServiceIDView(views.APIView):
         return Response(serializer.data)
 
     def patch(self, request):
-        if not request.data:  # 📌 입력 데이터가 비어있으면 에러 반환
+        if not request.data: 
             return Response({'message': '입력이 없습니다'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = self.serializer_class(request.user, data=request.data, partial=True)
@@ -168,40 +167,16 @@ class UserDeleteView(views.APIView):
 
 # 일반 유저 ############################################################################################
 
-# ✅ [일반] 회원가입
-class GeneralSignUpView(views.APIView):
-    permission_classes = [AllowAny]
-    serializer_class = GeneralSignUpSerializer
-
+# ✅ [일반] 가입 약관 동의
+class ConsentView(views.APIView):
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-
+        
+        serializer = ConsentSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            self.send_verification(request,user)
-            return Response({'message': '회원가입 성공! 이메일 인증 메일 확인 시 계정이 활성화 됩니다', 'data': serializer.data}, status=status.HTTP_201_CREATED)
-        return Response({'message': '회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
+        return Response({'error': serializer.errors}, status=400)
 
-# 📌 [일반] 이메일 인증
-class VerifyEmailView(views.APIView):
-    def get(self, request, uidb64, token):
-        try:
-            email = force_str(urlsafe_base64_decode(uidb64))
-        except (ValueError, TypeError, OverflowError):
-            return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # 토큰 확인
-        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
-        if not token_valid:
-            return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # 프론트에서 이 이메일로 본가입 진행하도록 안내
-        return Response({
-            'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
-            'email': email
-        }, status=status.HTTP_200_OK)
-
-# 📌 [일반] 이메일 인증 요청 (최종)
+# ✅ [일반] 이메일 인증 요청 (최종)
 class RequestEmailVerificationView(views.APIView):
     def post(self, request):
         email = request.data.get("email")
@@ -231,6 +206,39 @@ class RequestEmailVerificationView(views.APIView):
         )
 
         return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
+    
+# ✅ [일반] 이메일 인증
+class VerifyEmailView(views.APIView):
+    def get(self, request, uidb64, token):
+        try:
+            email = force_str(urlsafe_base64_decode(uidb64))
+        except (ValueError, TypeError, OverflowError):
+            return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 토큰 확인
+        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
+        if not token_valid:
+            return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 프론트에서 이 이메일로 본가입 진행하도록 안내
+        return Response({
+            'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
+            'email': email
+        }, status=status.HTTP_200_OK)
+
+# ✅ [일반] 회원가입
+class GeneralSignUpView(views.APIView):
+    permission_classes = [AllowAny]
+    serializer_class = GeneralSignUpSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.save()
+            self.send_verification(request,user)
+            return Response({'message': '회원가입 성공! 이메일 인증 메일 확인 시 계정이 활성화 됩니다', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({'message': '회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 # ✅ [일반] 로그인
 class LogInView(views.APIView):
