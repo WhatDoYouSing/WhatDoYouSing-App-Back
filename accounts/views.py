@@ -29,11 +29,13 @@ import requests
 import allauth
 import string
 
-BASE_URL = 'http://localhost:8000/'
+#BASE_URL = 'http://localhost:8000/'
+BASE_URL = 'http://3.39.188.131/'
 
 KAKAO_CONFIG = {
     "KAKAO_REST_API_KEY":getattr(WDYS.settings.base, 'KAKAO_CLIENT_ID', None),
-    "KAKAO_REDIRECT_URI": "http://localhost:8000/accounts/kakao/callback/",
+    #"KAKAO_REDIRECT_URI": "http://localhost:8000/accounts/kakao/callback/",
+    "KAKAO_REDIRECT_URI": "http://3.39.188.131/accounts/kakao/callback/",
     "KAKAO_CLIENT_SECRET_KEY": getattr(WDYS.settings.base, 'KAKAO_CLIENT_SECRET_KEY', None), 
 }
 kakao_login_uri = "https://kauth.kakao.com/oauth/authorize"
