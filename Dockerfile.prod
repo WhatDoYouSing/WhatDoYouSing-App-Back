@@ -11,15 +11,19 @@ WORKDIR /usr/src/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# install build dependencies for mysqlclient, cryptography, pillow, etc.
-RUN apk update && apk add --no-cache \
-    python3-dev mariadb-dev build-base \
-    libffi-dev openssl-dev rust cargo \
-    jpeg-dev zlib-dev linux-headers
+# install psycopg2 dependencies
+RUN apk update && apk add python3 python3-dev mariadb-dev build-base && pip3 install mysqlclient
+
+RUN apk add --no-cache libffi-dev openssl-dev rust cargo
+
+# dependencies for pillow
+RUN apk add --no-cache jpeg-dev zlib-dev
+RUN apk add --no-cache --virtual .build-deps linux-headers
 
 # install dependencies
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
+
 
 #########
 # FINAL #
