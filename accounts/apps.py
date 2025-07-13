@@ -6,6 +6,7 @@ class AccountsConfig(AppConfig):
     name = 'accounts'
 
     def ready(self):
+        import accounts.signals
         try:
             from .models import Title
             # 기본 레코드가 없는 경우 생성

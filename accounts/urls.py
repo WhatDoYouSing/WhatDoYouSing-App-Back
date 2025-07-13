@@ -22,7 +22,11 @@ urlpatterns = [
     # ✅ [소셜] 회원가입 & 로그인 관련
     path('social/signup/', SocialSignUpCompleteView.as_view()),  # 소셜 회원가입 설정 완료
 
-    # ✅ [카카오] OAuth 로그인 & 회원가입
+    # ✅ [카카오] OAuth 회원가입 & 로그인
     path('kakao/', KakaoLoginView.as_view()),  # 카카오 로그인 페이지 이동
     path('kakao/callback/', KakaoCallbackView.as_view()),  # 카카오 로그인 콜백
+
+    # 📌 [구글] OAuth 회원가입 & 로그인
+    path("google/", GoogleLoginView.as_view()),
+    path("google/callback/", GoogleCallbackView.as_view()),
 ]

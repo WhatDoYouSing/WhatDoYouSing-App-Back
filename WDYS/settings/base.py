@@ -35,6 +35,10 @@ KAKAO_CLIENT_ID=env('KAKAO_CLIENT_ID')
 KAKAO_APP_ID=env('KAKAO_APP_ID')
 KAKAO_CLIENT_SECRET_KEY=env('KAKAO_CLIENT_SECRET_KEY')
 
+GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
+GOOGLE_SECRET=env('GOOGLE_SECRET')
+GOOGLE_CALLBACK_URI=env('GOOGLE_CALLBACK_URI')
+
 EMAIL_BACKEND=env('EMAIL_BACKEND')
 EMAIL_HOST=env('EMAIL_HOST')
 EMAIL_PORT=env('EMAIL_PORT')
@@ -70,6 +74,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'dj_rest_auth.registration',
     'allauth.socialaccount.providers.kakao',
+    'allauth.socialaccount.providers.google',
 
     'accounts',
     'collects',

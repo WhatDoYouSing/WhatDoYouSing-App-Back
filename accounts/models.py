@@ -16,12 +16,12 @@ class Title(models.Model):
         return self.name  # 관리자 페이지 등에서 이름으로 표시
  
 class User(AbstractUser):
-    email = models.EmailField(unique=True, verbose_name="이메일 주소")
+    email = models.EmailField(unique=True, verbose_name="이메일 주소", null=True, blank=True)
     username = models.CharField(max_length=150, unique=True, verbose_name="아이디")
     serviceID = models.CharField(max_length=150, unique=True, verbose_name="서비스 내 아이디",null=True,blank=True)
     notif_token = models.TextField(null=True, blank=True, verbose_name="FCM 토큰")
-    nickname = models.CharField(max_length=50, verbose_name="닉네임")
-    profile = models.IntegerField(default=0, verbose_name="프로필")
+    nickname = models.CharField(max_length=50, verbose_name="닉네임", null=True, blank=True)
+    profile = models.IntegerField(default=0, verbose_name="프로필", null=True, blank=True)
     title_selection = models.ForeignKey(Title, on_delete=models.CASCADE, verbose_name="현재 칭호", null=True, blank=True)
 
     # 소셜 로그인 제공자 선택 (애플, 카카오, 구글)s
@@ -49,11 +49,13 @@ class User(AbstractUser):
         verbose_name_plural = "사용자"
 
     def save(self, *args, **kwargs):
+        '''
         if self.pk is None:  # 새로운 유저 생성 시
             blank_title = Title.objects.get(name="blank")
             UserTitle.objects.get_or_create(user=self, title=blank_title)
             self.title_selection = blank_title
             self.profile = self.profile or blank_title.emoji
+        '''
         super().save(*args, **kwargs)
 
     def __str__(self):
