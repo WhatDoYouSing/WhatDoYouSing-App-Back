@@ -24,12 +24,14 @@ RUN apk add --no-cache \
 # pip 최신화
 RUN pip install --upgrade pip setuptools wheel
 
-# cryptography는 미리 설치 (Rust 없이 호환 가능한 wheel 사용)
+# cryptography는 Rust 없이 설치 가능한 wheel을 미리 설치
 RUN pip install --only-binary cryptography cryptography==39.0.2
 
-# requirements에서 cryptography 제거 후 wheel 빌드
+# requirements.txt에서 cryptography 제외 → 별도 설치 처리
 COPY ./requirements.txt .
 RUN grep -v "cryptography" requirements.txt > requirements_nocrypto.txt
+
+# 휠 파일 생성 (cryptography 제외)
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements_nocrypto.txt
 
 
@@ -39,7 +41,7 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 
 FROM python:3.8.3-alpine
 
-# 사용자 및 작업 디렉토리 설정
+# 사용자 및 앱 디렉토리 설정
 RUN addgroup -S app && adduser -S app -G app
 ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
@@ -54,16 +56,20 @@ RUN apk add --no-cache \
     jpeg-dev \
     zlib-dev
 
-# 빌드 단계에서 생성된 휠 파일 및 requirements 복사
+# 빌드 시 필요한 컴파일러 임시 설치 (backports.zoneinfo 등 대비)
+RUN apk add --no-cache gcc musl-dev python3-dev
+
+# 빌더 단계에서 휠 파일 및 requirements 복사
 COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements_nocrypto.txt .
 COPY --from=builder /usr/src/app/requirements.txt .
 
-# 휠 설치 후 cryptography 따로 설치
+# 휠 설치 → cryptography 설치 → pip 정리
 RUN pip install --no-cache-dir /wheels/* && \
-    pip install --only-binary cryptography cryptography==39.0.2
+    pip install --only-binary cryptography cryptography==39.0.2 && \
+    apk del gcc musl-dev python3-dev
 
-# entrypoint 및 프로젝트 복사
+# entrypoint 및 프로젝트 코드 복사
 COPY ./config/docker/entrypoint.prod.sh $APP_HOME
 COPY . $APP_HOME
 
