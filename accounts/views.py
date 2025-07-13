@@ -377,9 +377,9 @@ class GoogleCallbackView(views.APIView):
         if not code:
             return Response({'error': 'Authorization code missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-        client_id = settings.GOOGLE_CLIENT_ID
-        client_secret = settings.GOOGLE_SECRET
-        redirect_uri = settings.GOOGLE_CALLBACK_URI
+        client_id=settings.GOOGLE_CLIENT_ID
+        client_secret=settings.GOOGLE_SECRET
+        redirect_uri=settings.GOOGLE_CALLBACK_URI
 
         # Access token 요청
         token_req_data = {
@@ -401,9 +401,6 @@ class GoogleCallbackView(views.APIView):
         profile_json = profile_res.json()
         social_type = 'google'
         social_id = f"{social_type}_{profile_json.get('id')}"
-        #email = profile_json.get('email')
-        #nickname = profile_json.get('name', '')
-        #profile = 0
 
         # 로그인 또는 회원가입
         try:
@@ -431,8 +428,8 @@ class GoogleLoginView(views.APIView):
 
     def get(self, request):
         print("REDIRECT URI:", settings.GOOGLE_CALLBACK_URI)
-        client_id = settings.GOOGLE_CLIENT_ID
-        redirect_uri = settings.GOOGLE_CALLBACK_URI
+        client_id=settings.GOOGLE_CLIENT_ID
+        redirect_uri=settings.GOOGLE_CALLBACK_URI
         scope = "openid"
         response_type = "code"
         access_type = "offline"
