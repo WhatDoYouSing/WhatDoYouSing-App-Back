@@ -45,7 +45,11 @@ RUN apk add --no-cache \
     libffi \
     openssl \
     jpeg \
-    zlib
+    zlib \
+    mariadb-dev \
+    gcc \
+    musl-dev \
+    python3-dev
 
 # pip 버전 업그레이드 ---------------------------------------------------------
 RUN python -m pip install --upgrade pip setuptools wheel
