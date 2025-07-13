@@ -1,6 +1,6 @@
-#################
-# BUILDER STAGE #
-#################
+###########
+# BUILDER #
+###########
 
 FROM python:3.8.3-alpine as builder
 
@@ -19,57 +19,54 @@ RUN apk add --no-cache \
     jpeg-dev \
     zlib-dev \
     linux-headers \
-    curl \
-    && rm -rf /var/cache/apk/*
+    curl
 
-# pip 최신화 및 cryptography 사전 빌드
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --only-binary cryptography cryptography==39.0.2
+# pip 최신화
+RUN pip install --upgrade pip setuptools wheel
 
-# requirements.txt 기반 휠 생성
+# cryptography는 미리 설치 (Rust 없이 호환 가능한 wheel 사용)
+RUN pip install --only-binary cryptography cryptography==39.0.2
+
+# requirements에서 cryptography 제거 후 wheel 빌드
 COPY ./requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
+RUN grep -v "cryptography" requirements.txt > requirements_nocrypto.txt
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements_nocrypto.txt
 
 
-################
-# FINAL STAGE  #
-################
+#########
+# FINAL #
+#########
 
 FROM python:3.8.3-alpine
 
-# 시스템 유저 생성
+# 사용자 및 작업 디렉토리 설정
 RUN addgroup -S app && adduser -S app -G app
-
-# 디렉토리 및 환경 변수 설정
 ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
 RUN mkdir -p $APP_HOME/static $APP_HOME/media
 WORKDIR $APP_HOME
 
-# 실행에 필요한 패키지 설치
+# 런타임 패키지 설치
 RUN apk add --no-cache \
     libpq \
     libffi-dev \
     openssl-dev \
     jpeg-dev \
-    zlib-dev \
-    mariadb-dev \
-    gcc \
-    python3-dev \
-    musl-dev
+    zlib-dev
 
-# builder에서 휠 복사 및 설치
+# 빌드 단계에서 생성된 휠 파일 및 requirements 복사
 COPY --from=builder /usr/src/app/wheels /wheels
+COPY --from=builder /usr/src/app/requirements_nocrypto.txt .
 COPY --from=builder /usr/src/app/requirements.txt .
-RUN pip install --no-cache /wheels/*
 
-# 빌드 시에만 필요한 패키지 제거
-RUN apk del gcc python3-dev musl-dev mariadb-dev
+# 휠 설치 후 cryptography 따로 설치
+RUN pip install --no-cache-dir /wheels/* && \
+    pip install --only-binary cryptography cryptography==39.0.2
 
-# 앱 파일 복사 및 권한 변경
+# entrypoint 및 프로젝트 복사
 COPY ./config/docker/entrypoint.prod.sh $APP_HOME
 COPY . $APP_HOME
-RUN chown -R app:app $APP_HOME
 
-# 앱 유저로 실행
+# 권한 설정
+RUN chown -R app:app $APP_HOME
 USER app
