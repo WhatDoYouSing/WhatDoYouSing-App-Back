@@ -174,7 +174,6 @@ class UserDeleteView(views.APIView):
 # ✅ [일반] 가입 약관 동의
 class ConsentView(views.APIView):
     def post(self, request):
-
         serializer = ConsentSerializer(data=request.data)
         if serializer.is_valid():
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
