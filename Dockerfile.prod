@@ -1,5 +1,6 @@
-# BUILDER #
-###########
+#################
+# BUILDER STAGE #
+#################
 
 FROM python:3.8.3-alpine as builder
 
@@ -21,30 +22,31 @@ RUN apk add --no-cache \
     curl \
     && rm -rf /var/cache/apk/*
 
-# pip 최신화 및 cryptography 사전 빌드 (Rust 없이 설치 가능하도록)
+# pip 최신화 및 cryptography 사전 빌드
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --only-binary cryptography cryptography==39.0.2
 
-# 휠 빌드
+# requirements.txt 기반 휠 생성
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
 
-#########
-# FINAL #
-#########
+################
+# FINAL STAGE  #
+################
 
 FROM python:3.8.3-alpine
 
-# 시스템 기본 설정
+# 시스템 유저 생성
 RUN addgroup -S app && adduser -S app -G app
 
+# 디렉토리 및 환경 변수 설정
 ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
 RUN mkdir -p $APP_HOME/static $APP_HOME/media
 WORKDIR $APP_HOME
 
-# 필요 패키지 설치
+# 실행에 필요한 패키지 설치
 RUN apk add --no-cache \
     libpq \
     libffi-dev \
@@ -56,17 +58,18 @@ RUN apk add --no-cache \
     python3-dev \
     musl-dev
 
-# 빌드된 휠 및 의존성 설치
+# builder에서 휠 복사 및 설치
 COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
 RUN pip install --no-cache /wheels/*
 
-# 빌드 의존성 삭제
+# 빌드 시에만 필요한 패키지 제거
 RUN apk del gcc python3-dev musl-dev mariadb-dev
 
-# 프로젝트 복사 및 권한 설정
+# 앱 파일 복사 및 권한 변경
 COPY ./config/docker/entrypoint.prod.sh $APP_HOME
 COPY . $APP_HOME
 RUN chown -R app:app $APP_HOME
 
+# 앱 유저로 실행
 USER app
