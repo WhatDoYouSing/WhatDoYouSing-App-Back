@@ -11,7 +11,8 @@ WORKDIR /usr/src/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# 종속성 설치 (Rust 없이 최소 패키지)
+
+# 필수 패키지만 설치
 RUN apk add --no-cache \
     python3-dev \
     mariadb-dev \
@@ -24,10 +25,10 @@ RUN apk add --no-cache \
     curl \
     && rm -rf /var/cache/apk/*
 
-# pip 업그레이드 (중요: cryptography wheel 지원 받기 위함)
-RUN pip install --upgrade pip setuptools wheel && pip install --only-binary cryptography cryptography==39.0.2
+# pip 최신화 및 cryptography 미리 설치
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --only-binary cryptography cryptography==39.0.2
 
-# requirements 복사 및 설치
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
