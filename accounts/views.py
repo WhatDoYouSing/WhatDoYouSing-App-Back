@@ -367,3 +367,85 @@ class KakaoCallbackView(views.APIView):
             return Response({'message':'카카오 회원가입 실패','error':serializer.errors},status=status.HTTP_400_BAD_REQUEST)
         
 # 구글 유저 ############################################################################################        
+
+# ✅ [Google] 로그인 콜백 및 처리
+class GoogleCallbackView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        code = request.query_params.get('code')
+        if not code:
+            return Response({'error': 'Authorization code missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+        client_id = settings.GOOGLE_CLIENT_ID
+        client_secret = settings.GOOGLE_SECRET
+        redirect_uri = settings.GOOGLE_CALLBACK_URI
+
+        # Access token 요청
+        token_req_data = {
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+        token_res = requests.post("https://oauth2.googleapis.com/token", data=token_req_data)
+        token_json = token_res.json()
+        access_token = token_json.get('access_token')
+        if not access_token:
+            return Response({'error': 'Access token retrieval failed'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 사용자 정보 요청
+        profile_res = requests.get("https://www.googleapis.com/oauth2/v2/userinfo",
+                                   headers={"Authorization": f"Bearer {access_token}"})
+        profile_json = profile_res.json()
+        social_type = 'google'
+        social_id = f"{social_type}_{profile_json.get('id')}"
+        #email = profile_json.get('email')
+        #nickname = profile_json.get('name', '')
+        #profile = 0
+
+        # 로그인 또는 회원가입
+        try:
+            user_in_db = User.objects.get(username=social_id)
+            data = {'username': social_id, 'password': social_id}
+            serializer = GLogInSerializer(data=data)
+            if serializer.is_valid():
+                return Response({'message': '구글 로그인 성공', 'data': serializer.validated_data}, status=status.HTTP_200_OK)
+            return Response({'message': '구글 로그인 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        except User.DoesNotExist:
+            data = {'username':social_id,'password':social_id}
+            serializer = GSignUpSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                data1 = {'username': social_id, 'password': social_id}
+                serializer1 = GLogInSerializer(data=data1)
+                if serializer1.is_valid():
+                    return Response({'message': '구글 회원가입 성공', 'data': serializer1.validated_data}, status=status.HTTP_201_CREATED)
+            return Response({'message': '구글 회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+# ✅ [Google] 로그인 요청
+class GoogleLoginView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        print("REDIRECT URI:", settings.GOOGLE_CALLBACK_URI)
+        client_id = settings.GOOGLE_CLIENT_ID
+        redirect_uri = settings.GOOGLE_CALLBACK_URI
+        scope = "openid"
+        response_type = "code"
+        access_type = "offline"
+        include_granted_scopes = "true"
+
+        uri = (
+            f"https://accounts.google.com/o/oauth2/v2/auth"
+            f"?client_id={client_id}"
+            f"&redirect_uri={redirect_uri}"
+            f"&response_type={response_type}"
+            f"&scope={scope}"
+            f"&access_type={access_type}"
+            f"&include_granted_scopes={include_granted_scopes}"
+        )
+
+        return redirect(uri)
