@@ -197,7 +197,7 @@ class RequestEmailVerificationView(views.APIView):
             reverse("verify_email", kwargs={"uidb64": uid, "token": token})
         )
 
-        subject = "🎵 WhatDoYouSing - 이메일 인증을 완료해주세요!"
+        subject = "[왓두유씽] 이메일 주소 인증이 도착했어요!"
         
         html_content = render_to_string("email.html", {
             "verification_link": verification_link,
