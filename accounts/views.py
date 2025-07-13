@@ -368,7 +368,7 @@ class KakaoCallbackView(views.APIView):
         
 # 구글 유저 ############################################################################################        
 
-# 📌 [Google] 로그인 콜백 및 처리
+# ✅ [Google] 로그인 콜백 및 처리
 class GoogleCallbackView(views.APIView):
     permission_classes = [AllowAny]
 
@@ -425,7 +425,7 @@ class GoogleCallbackView(views.APIView):
                     return Response({'message': '구글 회원가입 성공', 'data': serializer1.validated_data}, status=status.HTTP_201_CREATED)
             return Response({'message': '구글 회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-# [Google] 로그인 요청
+# ✅ [Google] 로그인 요청
 class GoogleLoginView(views.APIView):
     permission_classes = [AllowAny]
 

@@ -288,7 +288,7 @@ class KLogInSerializer(serializers.Serializer):
         
 # 구글 유저 ############################################################################################
 
-# 📌 구글 회원가입 Serializer
+# ✅ 구글 회원가입 Serializer
 # GSignUpSerializer
 class GSignUpSerializer(serializers.ModelSerializer):
     class Meta:
@@ -304,7 +304,7 @@ class GSignUpSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
-# 📌 구글 로그인 Serializer
+# ✅ 구글 로그인 Serializer
 class GLogInSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(max_length=128, write_only=True)
