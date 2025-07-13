@@ -11,21 +11,27 @@ WORKDIR /usr/src/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# install psycopg2 dependencies
-RUN apk update && apk add python3 python3-dev mariadb-dev build-base && pip3 install mysqlclient
+# 최소 의존성만 설치
+RUN apk add --no-cache \
+    python3-dev \
+    mariadb-dev \
+    build-base \
+    libffi-dev \
+    openssl-dev \
+    jpeg-dev \
+    zlib-dev \
+    linux-headers \
+    curl \
+    && rm -rf /var/cache/apk/*
 
-# install dependencies for cryptography (including rust via rustup)
-RUN apk add --no-cache libffi-dev openssl-dev curl
-
-# install latest rust using rustup
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+# rust 최신 버전 설치 (기본 툴체인만)
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# dependencies for pillow
-RUN apk add --no-cache jpeg-dev zlib-dev
-RUN apk add --no-cache --virtual .build-deps linux-headers
+# pip 최신화
+RUN pip install --upgrade pip
 
-# install dependencies
+# requirements 복사 및 wheel 빌드
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
