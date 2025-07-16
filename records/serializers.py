@@ -18,7 +18,7 @@ class EmotionsRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notes
         fields = [
-            
+            'artist', 'song_title', 'lyrics'
         ]
 
 # 📌 [레코드] 단어모음집 Serializer
