@@ -17,7 +17,7 @@ class MyPageSerializer(serializers.ModelSerializer):
         #팔로워 팔로우 목록 api 추가되면 카운트 가져오기
         fields = ['id','profile','title','serviceID', 'nickname','follower','following']
 
-# 📌 내 노트 Serializer
+# 📌 내 노트 Serializer 
 class MyNoteSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     class Meta:
