@@ -9,6 +9,7 @@ from django.db.models import Max
 from django.utils.dateparse import parse_date
 from rest_framework.exceptions import ValidationError
 from collections import OrderedDict, defaultdict
+from django.db.models import F 
 
 # Create your views here.
 
@@ -27,15 +28,6 @@ class MainRecordView(generics.ListAPIView):
         )
 
 # ✅ [레코드] 감정시집
-# views.py
-from collections import OrderedDict
-from datetime import datetime
-from django.db.models import Count
-from rest_framework import status, views
-from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
 class EmotionsRecordView(views.APIView):
     permission_classes = [IsAuthenticated]
 
@@ -87,3 +79,56 @@ class EmotionsRecordView(views.APIView):
             for emotion_name, notes in sorted_groups
         ]
         return Response(response_data, status=status.HTTP_200_OK)
+    
+# 📌 [레코드] 단어모음집
+class WordTopView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class   = WordStatSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        date_str = self.request.query_params.get("date")
+        if not date_str:
+            raise ValidationError({"message": "date 파라미터가 필요합니다. (YYYY-MM)"})
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m")
+        except ValueError:
+            raise ValidationError({"message": "YYYY-MM 형식이 아닙니다."})
+
+        return (
+            WordStat.objects
+            .filter(user=user, year=dt.year, month=dt.month)
+            .order_by("-count")[:10] 
+        )
+
+class WordDetailView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class   = NoteThumbSerializer
+
+    def get_queryset(self):
+        user      = self.request.user
+        date_str  = self.request.query_params.get("date")
+        noun      = self.kwargs["word"].lower()
+
+        if not date_str:
+            raise ValidationError({"message": "date 파라미터가 필요합니다. (YYYY-MM)"})
+        dt = datetime.strptime(date_str, "%Y-%m")
+
+        # 해당 월에 사용자 노트 중 noun 포함된 ID 추출
+        note_ids = (
+            NoteWord.objects
+            .filter(
+                noun=noun,
+                note__user=user,
+                note__created_at__year=dt.year,
+                note__created_at__month=dt.month,
+            )
+            .values_list("note_id", flat=True)
+        )
+
+        return (
+            Notes.objects
+            .filter(id__in=note_ids)
+            .order_by("created_at")       # 최신순
+            .select_related("emotion")     # 필요하다면
+        )

@@ -43,6 +43,10 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
+GOOGLE_SECRET=env('GOOGLE_SECRET')
+GOOGLE_CALLBACK_URI=env('GOOGLE_CALLBACK_URI')
+
 ALLOWED_HOSTS = ['*']
 
 # Application definition
@@ -70,6 +74,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'dj_rest_auth.registration',
     'allauth.socialaccount.providers.kakao',
+    'allauth.socialaccount.providers.google',
 
     'accounts',
     'collects',
