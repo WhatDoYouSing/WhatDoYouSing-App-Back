@@ -3,22 +3,23 @@
 #################
 FROM python:3.8.3-alpine AS builder
 
-# 작업 폴더
 WORKDIR /usr/src/app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
-# 파이썬 설정
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# ── 시스템 빌드 툴 + JDK (JPype1 컴파일) ──
+# ─ 시스템 빌드 툴 + JDK (JPype1 컴파일) ─
 RUN apk add --no-cache \
         build-base \
         openjdk17-jdk \
         python3-dev \
         jpeg-dev zlib-dev \
-        linux-headers
+        libffi-dev openssl-dev \
+        linux-headers \
+        curl
 
-# ── requirements wheel 생성 ──
+# pip 최신화
+RUN pip install --upgrade pip setuptools wheel
+
+# requirements 복사 & wheel 빌드
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --wheel-dir /usr/src/app/wheels -r requirements.txt \
  && python -m spacy download en_core_web_sm
@@ -29,7 +30,7 @@ RUN pip wheel --no-cache-dir --wheel-dir /usr/src/app/wheels -r requirements.txt
 #################
 FROM python:3.8.3-alpine
 
-# 앱 사용자·디렉터리 생성
+# 앱 사용자·폴더
 RUN addgroup -S app && adduser -S app -G app
 ENV HOME=/home/app \
     APP_HOME=/home/app/web \
@@ -40,23 +41,24 @@ ENV HOME=/home/app \
 RUN mkdir -p $APP_HOME/static $APP_HOME/media
 WORKDIR $APP_HOME
 
-# ── 런타임 라이브러리 ──
+# 런타임 라이브러리 (JRE 포함)
 RUN apk add --no-cache \
         openjdk17-jre-headless \
-        jpeg-dev zlib-dev \
-        libgcc libstdc++             # JPype1 실행에 필요한 기본 라이브러리
+        libffi openssl \
+        jpeg zlib \
+        libgcc libstdc++
 
-# ── 파이썬 패키지 설치 ──
+# wheel 설치
 COPY --from=builder /usr/src/app/wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
+COPY --from=builder /usr/src/app/requirements.txt .
+RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
-# ── 프로젝트 복사 ──
-COPY . $APP_HOME
+# 프로젝트 복사
 COPY ./config/docker/entrypoint.prod.sh $APP_HOME
+COPY . $APP_HOME
 
 # 권한 설정
 RUN chown -R app:app $APP_HOME
 USER app
 
-# (entrypoint에서 gunicorn 등 실행하도록 작성되어 있다고 가정)
 ENTRYPOINT ["sh", "./entrypoint.prod.sh"]
