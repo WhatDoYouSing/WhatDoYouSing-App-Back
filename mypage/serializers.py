@@ -15,7 +15,7 @@ class MyPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         #팔로워 팔로우 목록 api 추가되면 카운트 가져오기
-        fields = ['id','profile','title','serviceID', 'nickname','follower','following']
+        fields = ['id','profile','title_selection','serviceID', 'nickname','follower','following']
 
 # 📌 내 노트 Serializer 
 class MyNoteSerializer(serializers.ModelSerializer):
@@ -88,7 +88,7 @@ class NicknameUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['nickname']
-
+'''
 # 📌 달력 뷰 노트 썸네일
 class NoteThumbnailSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
@@ -118,3 +118,4 @@ class PliThumbnailSerializer(serializers.ModelSerializer):
         return "pli"
 
         #불러온 플리의 아이디를 가진 PliNotes 객체에 접근, 오래된 순으로 노트 id에 최대 4개 접근해 그 앨범아트를 가져와야 함
+'''

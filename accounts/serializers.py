@@ -287,7 +287,6 @@ class KLogInSerializer(serializers.Serializer):
 # 구글 유저 ############################################################################################
 
 # ✅ 구글 회원가입 Serializer
-# GSignUpSerializer
 class GSignUpSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

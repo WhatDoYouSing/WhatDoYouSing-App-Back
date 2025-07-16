@@ -29,5 +29,13 @@ class NoteWord(models.Model):
     note = models.ForeignKey("notes.Notes", on_delete=models.CASCADE)
     noun = models.CharField(max_length=100)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["note", "noun"],
+                name="uniq_note_noun",
+            )
+        ]
+
     def __str__(self):
         return f"{self.note_id} ▸ {self.noun}"

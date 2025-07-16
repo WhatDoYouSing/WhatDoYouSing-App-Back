@@ -16,6 +16,7 @@ def assign_blank_title(sender, instance, created, **kwargs):
         except Title.DoesNotExist:
             # logging.warning('Title "blank" does not exist')
             pass
+
 '''
 def check_title_conditions(user):
     """

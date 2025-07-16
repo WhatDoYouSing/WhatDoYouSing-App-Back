@@ -378,10 +378,10 @@ class GoogleCallbackView(views.APIView):
         if not code:
             return Response({'error': 'Authorization code missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-        client_id=settings.GOOGLE_CLIENT_ID
-        client_secret=settings.GOOGLE_SECRET
-        redirect_uri=settings.GOOGLE_CALLBACK_URI
-
+        client_id = settings.GOOGLE_CLIENT_ID
+        client_secret = settings.GOOGLE_SECRET
+        redirect_uri = settings.GOOGLE_CALLBACK_URI
+      
         # Access token 요청
         token_req_data = {
             'code': code,
@@ -429,8 +429,8 @@ class GoogleLoginView(views.APIView):
 
     def get(self, request):
         print("REDIRECT URI:", settings.GOOGLE_CALLBACK_URI)
-        client_id=settings.GOOGLE_CLIENT_ID
-        redirect_uri=settings.GOOGLE_CALLBACK_URI
+        client_id = settings.GOOGLE_CLIENT_ID
+        redirect_uri = settings.GOOGLE_CALLBACK_URI
         scope = "openid"
         response_type = "code"
         access_type = "offline"

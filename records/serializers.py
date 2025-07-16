@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from accounts.models import *
 from notes.models import Notes, Plis
 import random
+from .models import *
 
 # ✅ [레코드] 메인 Serializer
 class MainRecordSerializer(serializers.ModelSerializer):
@@ -21,10 +22,14 @@ class EmotionsRecordSerializer(serializers.ModelSerializer):
             'artist', 'song_title', 'lyrics'
         ]
 
-# 📌 [레코드] 단어모음집 Serializer
-class WordsRecordSerializer(serializers.ModelSerializer):
+# 📌 [레코드] 단어모음집 목록 Serializer
+class WordStatSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Notes
-        fields = [
-            
-        ]
+        model  = WordStat
+        fields = ("noun", "count")
+
+# 📌 [레코드] 단어모음집 상세 Serializer
+class NoteThumbSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Notes
+        fields = ("id", "lyrics")

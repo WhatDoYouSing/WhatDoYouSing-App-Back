@@ -7,6 +7,8 @@ from rest_framework import generics
 from datetime import datetime
 from django.db.models import Max
 from django.utils.dateparse import parse_date
+from calendar import monthrange
+from django.utils.dateparse import parse_date
 
 # Create your views here.
 
@@ -25,31 +27,34 @@ class MyContentView(views.APIView):
 
     def get(self, request, *args, **kwargs):
         content_type = request.query_params.get("type", None)
-        date_str = request.query_params.get("date", None)
+        date_str = request.query_params.get("date", None)  # 기대 형식: "YYYY-MM"
         user = request.user
 
-        date_filter = None
+        start_date = end_date = None
         if date_str:
-            date_filter = parse_date(date_str)  # "YYYY-MM-DD" → date 객체 변환
-            if not date_filter:
-                return Response({"message": "잘못된 날짜 형식입니다. YYYY-MM-DD 형식으로 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                year, month = map(int, date_str.split('-'))
+                start_date = datetime(year, month, 1)
+                last_day = monthrange(year, month)[1]
+                end_date = datetime(year, month, last_day, 23, 59, 59)
+            except ValueError:
+                return Response({"message": "잘못된 날짜 형식입니다. YYYY-MM 형식으로 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
 
-        notes = Notes.objects.filter(user=user).order_by('-created_at')
-        plis = Plis.objects.filter(user=user).order_by('-created_at')
+        notes = Notes.objects.filter(user=user)
+        plis = Plis.objects.filter(user=user)
 
-        if date_filter:
-            notes = notes.filter(created_at__date=date_filter)  # ✅ 해당 날짜의 노트만 필터링
-            plis = plis.filter(created_at__date=date_filter)  # ✅ 해당 날짜의 플리만 필터링
+        if start_date and end_date:
+            notes = notes.filter(created_at__range=(start_date, end_date))
+            plis = plis.filter(created_at__range=(start_date, end_date))
 
         if content_type == "note":
-            serializer = MyNoteSerializer(notes, many=True)
+            serializer = MyNoteSerializer(notes.order_by('-created_at'), many=True)
             return Response(serializer.data)
 
         elif content_type == "pli":
-            serializer = MyPliSerializer(plis, many=True)
+            serializer = MyPliSerializer(plis.order_by('-created_at'), many=True)
             return Response(serializer.data)
 
-        # ✅ content_type이 없으면 모든 데이터 합쳐서 정렬 후 반환
         combined_content = list(notes) + list(plis)
         combined_content.sort(key=lambda x: x.created_at, reverse=True)
 
