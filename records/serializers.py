@@ -22,13 +22,13 @@ class EmotionsRecordSerializer(serializers.ModelSerializer):
             'artist', 'song_title', 'lyrics'
         ]
 
-# 📌 [레코드] 단어모음집 목록 Serializer
+# ✅ [레코드] 단어모음집 목록 Serializer
 class WordStatSerializer(serializers.ModelSerializer):
     class Meta:
         model  = WordStat
         fields = ("noun", "count")
 
-# 📌 [레코드] 단어모음집 상세 Serializer
+# ✅ [레코드] 단어모음집 상세 Serializer
 class NoteThumbSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Notes
