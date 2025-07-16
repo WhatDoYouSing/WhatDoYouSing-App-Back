@@ -1,64 +1,68 @@
-#################
-#   BUILDER     #
-#################
-FROM python:3.8.3-alpine AS builder
+###########
+# BUILDER #
+###########
+
+FROM python:3.8.3-alpine as builder
 
 WORKDIR /usr/src/app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
-# ─ 시스템 빌드 툴 + JDK (JPype1 컴파일) ─
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# 필수 빌드 패키지 설치
 RUN apk add --no-cache \
-        build-base \
-        openjdk17-jdk \
-        python3-dev \
-        jpeg-dev zlib-dev \
-        libffi-dev openssl-dev \
-        linux-headers \
-        curl
+    python3-dev \
+    mariadb-dev \
+    build-base \
+    libffi-dev \
+    openssl-dev \
+    jpeg-dev \
+    zlib-dev \
+    linux-headers \
+    curl
 
 # pip 최신화
 RUN pip install --upgrade pip setuptools wheel
 
-# requirements 복사 & wheel 빌드
+# requirements 복사 및 wheel 생성 (전체)
 COPY ./requirements.txt .
-RUN pip wheel --no-cache-dir --wheel-dir /usr/src/app/wheels -r requirements.txt \
- && python -m spacy download en_core_web_sm
+RUN pip wheel --no-cache-dir --wheel-dir /usr/src/app/wheels -r requirements.txt
 
-
-#################
-#    FINAL      #
-#################
+#########
+# FINAL #
+#########
 FROM python:3.8.3-alpine
 
-# 앱 사용자·폴더
 RUN addgroup -S app && adduser -S app -G app
-ENV HOME=/home/app \
-    APP_HOME=/home/app/web \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    JAVA_HOME=/usr/lib/jvm/default-jvm
-
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/web
 RUN mkdir -p $APP_HOME/static $APP_HOME/media
 WORKDIR $APP_HOME
 
-# 런타임 라이브러리 (JRE 포함)
+# 런타임 패키지 (필요한 라이브러리만) ----------------------------------------
 RUN apk add --no-cache \
-        openjdk17-jre-headless \
-        libffi openssl \
-        jpeg zlib \
-        libgcc libstdc++
+    libpq \
+    libffi \
+    openssl \
+    jpeg \
+    zlib \
+    mariadb-dev \
+    gcc \
+    musl-dev \
+    python3-dev
 
-# wheel 설치
+# pip 버전 업그레이드 ---------------------------------------------------------
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# 빌더 단계 결과 복사 ---------------------------------------------------------
 COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
+
+# 로컬 wheel만 사용해 의존성 설치 -------------------------------------------
 RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
-# 프로젝트 복사
+# 프로젝트 복사 및 권한 설정 ---------------------------------------------------
 COPY ./config/docker/entrypoint.prod.sh $APP_HOME
 COPY . $APP_HOME
-
-# 권한 설정
 RUN chown -R app:app $APP_HOME
 USER app
-
-ENTRYPOINT ["sh", "./entrypoint.prod.sh"]
