@@ -16,3 +16,6 @@ typing_extensions==4.12.2
 tzdata
 requests
 dj-rest-auth
+KoNLPy>=0.6.0     
+JPype1>=1.4.1    
+spacy>=3.7.2 

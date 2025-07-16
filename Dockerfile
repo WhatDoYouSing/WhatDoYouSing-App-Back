@@ -1,24 +1,24 @@
-# Python 3.9.6 기반 이미지 사용
-FROM python:3.9.6-alpine
+# ─── Debian 기반 Python 3.11 ─────────────────────────
+FROM python:3.11-slim
+
 ENV PYTHONUNBUFFERED=1
 
-# 앱 디렉토리 생성 및 설정
-RUN mkdir /app
 WORKDIR /app
 
-# MySQL 클라이언트 의존성 설치
-RUN apk add --no-cache mariadb-connector-c-dev
-RUN apk update && apk add --no-cache \
-    python3 \
-    python3-dev \
-    mariadb-dev \
-    build-base && \
-    pip3 install mysqlclient && \
-    apk del python3-dev mariadb-dev build-base
+# 시스템 의존성
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \    
+        openjdk-17-jdk-headless \
+        default-libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 의존성 설치
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+ && pip install --prefer-binary -r requirements.txt \
+ && python -m spacy download en_core_web_sm \
+ && apt-get purge -y --auto-remove build-essential
 
-# 프로젝트 파일 복사
-COPY . /app/
+COPY . .
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

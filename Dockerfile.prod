@@ -1,69 +1,62 @@
-# BUILDER #
-###########
+#################
+#   BUILDER     #
+#################
+FROM python:3.8.3-alpine AS builder
 
-# pull official base image
-FROM python:3.8.3-alpine as builder
-
-# set work directory
+# 작업 폴더
 WORKDIR /usr/src/app
 
+# 파이썬 설정
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# ── 시스템 빌드 툴 + JDK (JPype1 컴파일) ──
+RUN apk add --no-cache \
+        build-base \
+        openjdk17-jdk \
+        python3-dev \
+        jpeg-dev zlib-dev \
+        linux-headers
 
-# install psycopg2 dependencies
-RUN apk update && apk add python3 python3-dev mariadb-dev build-base && pip3 install mysqlclient
-
-# dependencies for pillow
-RUN apk add --no-cache jpeg-dev zlib-dev
-RUN apk add --no-cache --virtual .build-deps linux-headers
-
-# install dependencies
+# ── requirements wheel 생성 ──
 COPY ./requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
+RUN pip wheel --no-cache-dir --wheel-dir /usr/src/app/wheels -r requirements.txt \
+ && python -m spacy download en_core_web_sm
 
 
-#########
-# FINAL #
-#########
-
-# pull official base image
+#################
+#    FINAL      #
+#################
 FROM python:3.8.3-alpine
 
-# create directory for the app user
-RUN mkdir -p /home/app
-
-# create the app user
+# 앱 사용자·디렉터리 생성
 RUN addgroup -S app && adduser -S app -G app
+ENV HOME=/home/app \
+    APP_HOME=/home/app/web \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    JAVA_HOME=/usr/lib/jvm/default-jvm
 
-# create the appropriate directories
-ENV HOME=/home/app
-ENV APP_HOME=/home/app/web
-RUN mkdir $APP_HOME
-RUN mkdir $APP_HOME/static
-RUN mkdir $APP_HOME/media
+RUN mkdir -p $APP_HOME/static $APP_HOME/media
 WORKDIR $APP_HOME
 
-# install dependencies
-RUN apk update && apk add libpq
-RUN apk update \
-    && apk add --virtual build-deps gcc python3-dev musl-dev \
-    && apk add --no-cache jpeg-dev zlib-dev mariadb-dev
-COPY --from=builder /usr/src/app/wheels /wheels
-COPY --from=builder /usr/src/app/requirements.txt .
-RUN pip install mysqlclient
-RUN pip install --no-cache /wheels/*
-RUN apk del build-deps
+# ── 런타임 라이브러리 ──
+RUN apk add --no-cache \
+        openjdk17-jre-headless \
+        jpeg-dev zlib-dev \
+        libgcc libstdc++             # JPype1 실행에 필요한 기본 라이브러리
 
-# copy entrypoint-prod.sh
+# ── 파이썬 패키지 설치 ──
+COPY --from=builder /usr/src/app/wheels /wheels
+RUN pip install --no-cache-dir /wheels/*
+
+# ── 프로젝트 복사 ──
+COPY . $APP_HOME
 COPY ./config/docker/entrypoint.prod.sh $APP_HOME
 
-# copy project
-COPY . $APP_HOME
-
-# chown all the files to the app user
+# 권한 설정
 RUN chown -R app:app $APP_HOME
-
-# change to the app user
 USER app
+
+# (entrypoint에서 gunicorn 등 실행하도록 작성되어 있다고 가정)
+ENTRYPOINT ["sh", "./entrypoint.prod.sh"]

@@ -13,7 +13,7 @@ class MainRecordSerializer(serializers.ModelSerializer):
             'album_art'
         ]
     
-# 📌 [레코드] 감정시집 Serializer
+# ✅ [레코드] 감정시집 Serializer
 class EmotionsRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notes

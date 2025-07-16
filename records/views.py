@@ -26,7 +26,7 @@ class MainRecordView(generics.ListAPIView):
             .order_by('-created_at')[:10]   # 최신 10개
         )
 
-# 📌 [레코드] 감정시집
+# ✅ [레코드] 감정시집
 # views.py
 from collections import OrderedDict
 from datetime import datetime
