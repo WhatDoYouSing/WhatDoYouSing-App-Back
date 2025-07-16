@@ -1,4 +1,5 @@
-# records/signals.py
+# 배포용 잠시 비활성화
+'''
 from collections import Counter
 from django.db import transaction
 from django.db.models.signals import post_save, pre_delete
@@ -78,3 +79,4 @@ def update_wordstat_on_delete(sender, instance, **kwargs):
     user        = instance.user
     counter     = Counter(extract_nouns(instance.lyrics))
     _adjust_wordstat(user, year, month, counter, delta=-1)
+'''
