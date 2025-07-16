@@ -4,6 +4,19 @@ from django.dispatch import receiver
 from django.utils.timezone import now
 from .models import *
 
+@receiver(post_save, sender=User)
+def assign_blank_title(sender, instance, created, **kwargs):
+    if created:
+        try:
+            blank_title = Title.objects.get(name="blank")
+            UserTitle.objects.get_or_create(user=instance, title=blank_title)
+            instance.title_selection = blank_title
+            instance.profile = instance.profile or blank_title.emoji
+            instance.save()
+        except Title.DoesNotExist:
+            # logging.warning('Title "blank" does not exist')
+            pass
+
 '''
 def check_title_conditions(user):
     """
@@ -42,16 +55,3 @@ def activate_title(user, title):
         user_title.acquired_at = now()
         user_title.save()
 '''
-
-@receiver(post_save, sender=User)
-def assign_blank_title(sender, instance, created, **kwargs):
-    if created:
-        try:
-            blank_title = Title.objects.get(name="blank")
-            UserTitle.objects.get_or_create(user=instance, title=blank_title)
-            instance.title_selection = blank_title
-            instance.profile = instance.profile or blank_title.emoji
-            instance.save()
-        except Title.DoesNotExist:
-            # logging.warning('Title "blank" does not exist')
-            pass

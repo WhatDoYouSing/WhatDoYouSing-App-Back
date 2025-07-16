@@ -228,8 +228,6 @@ class SocialSignUpSerializer(serializers.ModelSerializer):
         instance.required_consent = validated_data['required_consent']
         instance.push_notification_consent = validated_data.get('push_notification_consent', False)
         instance.marketing_consent = validated_data.get('marketing_consent', False)
-        if not instance.title and first_title:
-            instance.title = first_title.name  # 기본 칭호 자동 설정
 
         instance.save()
         return instance

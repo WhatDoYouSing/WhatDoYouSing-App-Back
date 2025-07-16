@@ -29,11 +29,13 @@ import requests
 import allauth
 import string
 
-BASE_URL = 'http://localhost:8000/'
+#BASE_URL = 'http://localhost:8000/'
+BASE_URL = 'http://3.39.188.131/'
 
 KAKAO_CONFIG = {
     "KAKAO_REST_API_KEY":getattr(WDYS.settings.base, 'KAKAO_CLIENT_ID', None),
-    "KAKAO_REDIRECT_URI": "http://localhost:8000/accounts/kakao/callback/",
+    #"KAKAO_REDIRECT_URI": "http://localhost:8000/accounts/kakao/callback/",
+    "KAKAO_REDIRECT_URI": "http://3.39.188.131/accounts/kakao/callback/",
     "KAKAO_CLIENT_SECRET_KEY": getattr(WDYS.settings.base, 'KAKAO_CLIENT_SECRET_KEY', None), 
 }
 kakao_login_uri = "https://kauth.kakao.com/oauth/authorize"
@@ -172,7 +174,6 @@ class UserDeleteView(views.APIView):
 # ✅ [일반] 가입 약관 동의
 class ConsentView(views.APIView):
     def post(self, request):
-
         serializer = ConsentSerializer(data=request.data)
         if serializer.is_valid():
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
@@ -197,7 +198,7 @@ class RequestEmailVerificationView(views.APIView):
             reverse("verify_email", kwargs={"uidb64": uid, "token": token})
         )
 
-        subject = "🎵 WhatDoYouSing - 이메일 인증을 완료해주세요!"
+        subject = "[왓두유씽] 이메일 주소 인증이 도착했어요!"
         
         html_content = render_to_string("email.html", {
             "verification_link": verification_link,
@@ -366,7 +367,7 @@ class KakaoCallbackView(views.APIView):
                     return Response({'message':'카카오 회원가입 성공','data':serializer1.validated_data}, status=status.HTTP_201_CREATED)
             return Response({'message':'카카오 회원가입 실패','error':serializer.errors},status=status.HTTP_400_BAD_REQUEST)
         
-# 구글 유저 ############################################################################################               
+# 구글 유저 ############################################################################################        
 
 # ✅ [Google] 로그인 콜백 및 처리
 class GoogleCallbackView(views.APIView):
@@ -380,7 +381,7 @@ class GoogleCallbackView(views.APIView):
         client_id = settings.GOOGLE_CLIENT_ID
         client_secret = settings.GOOGLE_SECRET
         redirect_uri = settings.GOOGLE_CALLBACK_URI
-
+      
         # Access token 요청
         token_req_data = {
             'code': code,
@@ -401,9 +402,6 @@ class GoogleCallbackView(views.APIView):
         profile_json = profile_res.json()
         social_type = 'google'
         social_id = f"{social_type}_{profile_json.get('id')}"
-        #email = profile_json.get('email')
-        #nickname = profile_json.get('name', '')
-        #profile = 0
 
         # 로그인 또는 회원가입
         try:
