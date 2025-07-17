@@ -17,6 +17,11 @@ typing_extensions==4.12.2
 tzdata
 requests
 dj-rest-auth
-#KoNLPy>=0.6.0     
-#JPype1>=1.4.1    
-#spacy>=3.7.2 
+# 형태소 분석 라이브러리 - 아직 배포 환경에 적용 불가
+KoNLPy>=0.6.0     
+JPype1>=1.4.1    
+spacy>=3.7.2 
+# 애플로그인 테스트용 라이브러리 - 배포 X
+# pyOpenSSL>=23.0.0
+# django-extensions==3.2.3
+# werkzeug>=2.2.0

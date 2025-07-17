@@ -4,18 +4,27 @@ from django.contrib.auth import get_user_model
 from accounts.models import *
 from notes.models import Notes, Plis
 import random
+from social.models import *
 
 User = get_user_model()
 
 # 📌 마이페이지 기본
 class MyPageSerializer(serializers.ModelSerializer):
-    follower = serializers.IntegerField(default=0)
-    following = serializers.IntegerField(default=0)
+    follower = serializers.SerializerMethodField()
+    following = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         #팔로워 팔로우 목록 api 추가되면 카운트 가져오기
         fields = ['id','profile','title_selection','serviceID', 'nickname','follower','following']
+
+    def get_follower(self, obj):
+        # 팔로우 당한 사람 = 나를 팔로우한 유저 수
+        return UserFollows.objects.filter(following=obj).count()
+
+    def get_following(self, obj):
+        # 내가 팔로우한 유저 수
+        return UserFollows.objects.filter(follower=obj).count()
 
 # 📌 내 노트 Serializer 
 class MyNoteSerializer(serializers.ModelSerializer):

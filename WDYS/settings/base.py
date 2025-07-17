@@ -51,6 +51,12 @@ GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
 GOOGLE_SECRET=env('GOOGLE_SECRET')
 GOOGLE_CALLBACK_URI=env('GOOGLE_CALLBACK_URI')
 
+APPLE_TEAM_ID=env('APPLE_TEAM_ID')
+APPLE_CLIENT_ID=env('APPLE_CLIENT_ID')
+APPLE_REDIRECT_URI=env('APPLE_REDIRECT_URI')
+APPLE_KEY_ID=env('APPLE_KEY_ID')
+APPLE_PRIVATE_KEY=env('APPLE_PRIVATE_KEY')
+
 ALLOWED_HOSTS = ['*']
 
 # Application definition
@@ -62,6 +68,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    #'django_extensions',
 
     'corsheaders',
 

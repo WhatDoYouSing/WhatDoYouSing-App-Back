@@ -80,8 +80,6 @@ class EmotionsRecordView(views.APIView):
         ]
         return Response(response_data, status=status.HTTP_200_OK)
 
-# 배포용 잠시 비활성화
-'''
 # ✅ [레코드] 단어모음집
 class WordTopView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -134,4 +132,3 @@ class WordDetailView(generics.ListAPIView):
             .order_by("created_at")       # 최신순
             .select_related("emotion")     # 필요하다면
         )
-'''

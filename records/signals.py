@@ -1,4 +1,3 @@
-# 배포용 잠시 비활성화
 '''
 from collections import Counter
 from django.db import transaction
