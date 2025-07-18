@@ -350,58 +350,21 @@ class SearchPlisSerializer(serializers.ModelSerializer):
     PlisTitle = SearchPlisLSSPSerializer(many=True)  # 플리 제목에서 검색된 플리
 
 
-# 팔로잉 관련 serializer
-class SearchWritersFollowSerializer(serializers.ModelSerializer):
-    is_following = serializers.SerializerMethodField()  # 내가 팔로우한 유저인지
-    is_follower = serializers.SerializerMethodField()  # 나를 팔로우하는 유저인지
-    is_mutual_follow = serializers.SerializerMethodField()  # 맞팔 여부
+class FollowStatusSerializer(serializers.Serializer):
+    is_following = serializers.BooleanField(read_only=True)
+    is_follower = serializers.BooleanField(read_only=True)
+    is_mutual_follow = serializers.SerializerMethodField()
 
-    class Meta:
-        model = User
-        fields = [
-            "is_following",
-            "is_follower",
-            "is_mutual_follow",
-        ]
-
-    def get_is_following(self, obj):
-        """현재 로그인한 사용자가 해당 사용자를 팔로우하는지"""
-        request = self.context.get("request")
-        if request and request.user.is_authenticated:
-            return UserFollows.objects.filter(
-                follower=request.user, following=obj
-            ).exists()
-        return False
-
-    def get_is_follower(self, obj):
-        """해당 사용자가 현재 로그인한 사용자를 팔로우하는지"""
-        request = self.context.get("request")
-        if request and request.user.is_authenticated:
-            return UserFollows.objects.filter(
-                follower=obj, following=request.user
-            ).exists()
-        return False
-
-    def get_is_mutual_follow(self, obj):
-        """맞팔 여부 확인"""
-        return self.get_is_following(obj) and self.get_is_follower(obj)
+    def get_is_mutual_follow(self, user):
+        # annotate 된 값 사용
+        return getattr(user, "is_following", False) and getattr(
+            user, "is_follower", False
+        )
 
 
-# 작성자 탐색결과
 class SearchWritersSerializer(serializers.ModelSerializer):
-    follow_status = serializers.SerializerMethodField()
+    follow_status = FollowStatusSerializer(source="*", read_only=True)
 
     class Meta:
         model = User
-        fields = [
-            "id",
-            "nickname",
-            "username",
-            "profile",
-            "follow_status",
-        ]
-
-    def get_follow_status(self, obj):
-        """해당 유저의 팔로우 상태 정보를 UserFollowStatusSerializer로 전달"""
-        request = self.context.get("request")
-        return SearchWritersFollowSerializer(obj, context={"request": request}).data
+        fields = ["id", "nickname", "username", "profile", "follow_status"]

@@ -3,7 +3,8 @@ from django.db.models import Value, CharField
 from django.shortcuts import render
 from rest_framework import status, views
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Value, BooleanField, Q
+from social.models import UserFollows
 from accounts.models import User
 from notes.models import *
 from .serializers import *
@@ -864,16 +865,30 @@ class SearchWritersView(views.APIView):
             )
 
         # 검색 실행
-        search_results = User.objects.filter(query).distinct()
+        qs = User.objects.filter(query).distinct()
 
+        # 4. 로그인 여부에 따라 annotate
+        me = request.user
+        if me.is_authenticated:
+            qs = qs.annotate(
+                is_following=Exists(
+                    UserFollows.objects.filter(follower=me, following=OuterRef("pk"))
+                ),
+                is_follower=Exists(
+                    UserFollows.objects.filter(follower=OuterRef("pk"), following=me)
+                ),
+            )
+        else:
+            # 비로그인 시 항상 False
+            qs = qs.annotate(
+                is_following=Value(False, output_field=BooleanField()),
+                is_follower=Value(False, output_field=BooleanField()),
+            )
+
+        serializer = SearchWritersSerializer(
+            qs, many=True, context={"request": request}
+        )
         return Response(
-            {
-                "message": "탐색결과 작성자 조회 성공",
-                "data": {
-                    "user": SearchWritersSerializer(
-                        search_results, many=True, context={"request": request}
-                    ).data
-                },
-            },
+            {"message": "탐색결과 작성자 조회 성공", "data": {"user": serializer.data}},
             status=status.HTTP_200_OK,
         )
