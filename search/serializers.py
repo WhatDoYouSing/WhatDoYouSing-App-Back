@@ -1,17 +1,32 @@
 from rest_framework import serializers
 from notes.models import *
 from accounts.models import *
+from social.models import UserFollows
 from accounts.serializers import UserSerializer
 
-"""
-# <노트> 탐색 결과 serializer
-# Memo
-class SearchNotesMemoSerializer(serializers.ModelSerializer):
+# 전부 다 tag 필드 삭제하기!
+
+
+# 탐색결과(전체)
+# Writer 정보
+class SearchAllWriterSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = Notes
         fields = [
+            "user",
+        ]
+
+
+# Note 타입 - 메모
+class SearchAllMemoNotesSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="note")
+
+    class Meta:
+        model = Notes
+        fields = [
+            "type",
             "id",
             "user",
             "link",
@@ -24,16 +39,63 @@ class SearchNotesMemoSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
+            "tag_time",
+            "tag_season",
+            "tag_context",
         ]
 
 
-# Lyrics, Title, Singer
-class SearchNotesLTSSerializer(serializers.ModelSerializer):
+# Pli 타입 - 메모
+class SearchAllPlisSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="pli")
+    user = UserSerializer(read_only=True)
+    note_count = serializers.SerializerMethodField()
+    firstmemo = serializers.SerializerMethodField()
+    album_art = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Plis
+        fields = [
+            "type",
+            "id",
+            "user",
+            "note_count",
+            "album_art",
+            "title",
+            "firstmemo",
+            "visibility",
+            "created_at",
+            "is_updated",
+            "tag_time",
+            "tag_season",
+            "tag_context",
+        ]
+
+    def get_note_count(self, obj):  # 인용된 노트 개수 카운트
+        return PliNotes.objects.filter(plis=obj).count()
+
+    def get_firstmemo(self, obj):  # 첫 번째 인용된 노트의 메모 반환
+        first_note = PliNotes.objects.filter(plis=obj).order_by("created_at").first()
+        return first_note.note_memo if first_note and first_note.note_memo else ""
+        # 첫번째 노트에 대한 메모 없으면 빈문자열 반환
+
+    def get_album_art(self, obj):
+        """해당 플리에 포함된 노트의 앨범 아트 최대 4개 반환"""
+        album_arts = PliNotes.objects.filter(plis=obj).values_list(
+            "notes__album_art", flat=True
+        )[:4]
+        return list(album_arts) if album_arts else []
+
+
+# Note 타입 - Lyrics, SongTitle, Singer
+class SearchAllNotesLSSSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="note")
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = Notes
         fields = [
+            "type",
             "id",
             "user",
             "link",
@@ -45,16 +107,57 @@ class SearchNotesLTSSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
+            "tag_time",
+            "tag_season",
+            "tag_context",
         ]
 
 
-# Location
-class SearchNotesLocationSerializer(serializers.ModelSerializer):
+# Pli 타입 - SongTitle, Singer, PlisTitle
+# 결과 정확도 확인 위해 잠시 relatednote 필드 추가 - 삭제하기
+class SearchAllPlisSSPSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="pli")
+    user = UserSerializer(read_only=True)
+    note_count = serializers.SerializerMethodField()
+    album_art = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Plis
+        fields = [
+            "type",
+            "id",
+            "user",
+            "note_count",
+            "album_art",
+            "title",
+            "visibility",
+            "created_at",
+            "is_updated",
+            "tag_time",
+            "tag_season",
+            "tag_context",
+        ]
+
+    def get_note_count(self, obj):
+        return PliNotes.objects.filter(plis=obj).count()
+
+    def get_album_art(self, obj):
+        """해당 플리에 포함된 노트의 앨범 아트 최대 4개 반환"""
+        album_arts = PliNotes.objects.filter(plis=obj).values_list(
+            "notes__album_art", flat=True
+        )[:4]
+        return list(album_arts) if album_arts else []
+
+
+# Note 타입 - Location
+class SearchAllNotesLocationSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="note")
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = Notes
         fields = [
+            "type",
             "id",
             "user",
             "link",
@@ -68,8 +171,10 @@ class SearchNotesLocationSerializer(serializers.ModelSerializer):
             "is_updated",
             "location_name",
             "location_address",
+            "tag_time",
+            "tag_season",
+            "tag_context",
         ]
-"""
 
 
 # test 용. 테스트 후 tag 필드 없는 걸로
@@ -245,7 +350,47 @@ class SearchPlisSerializer(serializers.ModelSerializer):
     PlisTitle = SearchPlisLSSPSerializer(many=True)  # 플리 제목에서 검색된 플리
 
 
+# 팔로잉 관련 serializer
+class SearchWritersFollowSerializer(serializers.ModelSerializer):
+    is_following = serializers.SerializerMethodField()  # 내가 팔로우한 유저인지
+    is_follower = serializers.SerializerMethodField()  # 나를 팔로우하는 유저인지
+    is_mutual_follow = serializers.SerializerMethodField()  # 맞팔 여부
+
+    class Meta:
+        model = User
+        fields = [
+            "is_following",
+            "is_follower",
+            "is_mutual_follow",
+        ]
+
+    def get_is_following(self, obj):
+        """현재 로그인한 사용자가 해당 사용자를 팔로우하는지"""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return UserFollows.objects.filter(
+                follower=request.user, following=obj
+            ).exists()
+        return False
+
+    def get_is_follower(self, obj):
+        """해당 사용자가 현재 로그인한 사용자를 팔로우하는지"""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return UserFollows.objects.filter(
+                follower=obj, following=request.user
+            ).exists()
+        return False
+
+    def get_is_mutual_follow(self, obj):
+        """맞팔 여부 확인"""
+        return self.get_is_following(obj) and self.get_is_follower(obj)
+
+
+# 작성자 탐색결과
 class SearchWritersSerializer(serializers.ModelSerializer):
+    follow_status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -253,4 +398,10 @@ class SearchWritersSerializer(serializers.ModelSerializer):
             "nickname",
             "username",
             "profile",
+            "follow_status",
         ]
+
+    def get_follow_status(self, obj):
+        """해당 유저의 팔로우 상태 정보를 UserFollowStatusSerializer로 전달"""
+        request = self.context.get("request")
+        return SearchWritersFollowSerializer(obj, context={"request": request}).data
