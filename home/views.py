@@ -11,27 +11,17 @@ from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from notifs.models import *
 
+from rest_framework.pagination import PageNumberPagination
+
+class TenItemPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 class HomeView(APIView):
     permission_classes=[IsAuthenticated]
     def get(self,request):
-        # 임시 - 필요 시 페이지네이션 추가
-
         user = request.user  # 현재 로그인된 유저
-        
-        # # Notes 필터링: 공개 노트 + 팔로우한 사용자의 'friends' 공개 노트 + 자신이 작성한 노트
-        # notes = Notes.objects.filter(
-        #     Q(visibility='public') | 
-        #     Q(user__in=UserFollows.objects.filter(follower=user).values('following'),visibility='friends') |  # 임시
-        #     Q(user=user)  
-        # ).order_by('-created_at')
-        
-        # # Plis 필터링: 공개 플리 + 팔로우한 사용자의 'friends' 공개 플리 + 자신이 작성한 플리
-        # plis = Plis.objects.filter(
-        #     Q(visibility='public') | 
-        #     Q(user__in=UserFollows.objects.filter(follower=user).values('following'),visibility='friends') | # 임시
-        #     Q(user=user)  
-        # ).order_by('-created_at')
 
 
         friends = UserFollows.objects.filter(
@@ -53,23 +43,38 @@ class HomeView(APIView):
         ).order_by('-created_at')
         
         # 데이터 통합
-        combined_data = []
-        for note in notes:
-            combined_data.append(NoteSerializer(note).data)
-        for pli in plis:
-            combined_data.append(PliSerializer(pli).data)
+        note_data = [NoteSerializer(n).data for n in notes]
+        pli_data = [PliSerializer(p).data for p in plis]
+        combined = sorted(note_data + pli_data, key=lambda x: x["created_at"], reverse=True)
+
+        # 페이지네이션 적용
+        paginator = TenItemPagination()
+        paginated_data = paginator.paginate_queryset(combined, request)
+
+        # combined_data = []
+        # for note in notes:
+        #     combined_data.append(NoteSerializer(note).data)
+        # for pli in plis:
+        #     combined_data.append(PliSerializer(pli).data)
         
         # 최신순으로 정렬
-        combined_data.sort(key=lambda x: x['created_at'], reverse=True)
+        # combined_data.sort(key=lambda x: x['created_at'], reverse=True)
 
         unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
         notify = True if unread_notifications else False
 
+        total_items = paginator.page.paginator.count
+        current_page = paginator.page.number
+        total_pages = paginator.page.paginator.num_pages
+
         return Response({
                 "message": "통합 홈 조회",
+                "total_items": total_items,
+                "current_page":current_page,
+                "total_pages":total_pages,
                 "data": {
                     "notify": notify,
-                    "content": combined_data
+                    "content": paginated_data
                 }
             }, status=status.HTTP_200_OK)
 
@@ -91,13 +96,23 @@ class HomePliView(APIView):
             Q(user__in=friends,visibility='friends') |  # 친구가 작성한 플리
             Q(user=user)  # 자신이 작성한 플리
         ).order_by('-created_at')
-        serializers = PliSerializer(plis, many=True)
+
+        paginator = TenItemPagination()
+        paginated_plis = paginator.paginate_queryset(plis, request)
+        serializers = PliSerializer(paginated_plis, many=True)
 
         unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
         notify = True if unread_notifications else False
 
+        total_items = paginator.page.paginator.count
+        current_page = paginator.page.number
+        total_pages = paginator.page.paginator.num_pages
+
         return Response({
                 "message": "플리 홈 조회",
+                "total_items": total_items,
+                "current_page":current_page,
+                "total_pages":total_pages,
                 "data": {
                     "notify": notify,
                     "content": serializers.data
@@ -121,13 +136,23 @@ class HomeNoteView(APIView):
             Q(user=user)  # 자신이 작성한 노트
         ).order_by('-created_at')
         
-        serializers = NoteSerializer(notes, many=True)
+
+        paginator = TenItemPagination()
+        paginated_notes = paginator.paginate_queryset(notes, request)
+        serializers = NoteSerializer(paginated_notes, many=True)
 
         unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
         notify = True if unread_notifications else False
 
+        total_items = paginator.page.paginator.count
+        current_page = paginator.page.number
+        total_pages = paginator.page.paginator.num_pages
+
         return Response({
                 "message": "노트 홈 조회",
+                "total_items": total_items,
+                "current_page":current_page,
+                "total_pages":total_pages,
                 "data": {
                     "notify": notify,
                     "content": serializers.data
@@ -174,14 +199,25 @@ class HomeFollowView(APIView):
         # 최신순으로 정렬
         combined_data.sort(key=lambda x: x['created_at'], reverse=True)
 
+        paginator = TenItemPagination()
+        paginated_data = paginator.paginate_queryset(combined_data, request)
+
         unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
         notify = True if unread_notifications else False
 
+        total_items = paginator.page.paginator.count
+        current_page = paginator.page.number
+        total_pages = paginator.page.paginator.num_pages
+
+
         return Response({
                 "message": "팔로우 홈 조회",
+                "total_items": total_items,
+                "current_page":current_page,
+                "total_pages":total_pages,
                 "data": {
                     "notify": notify,
-                    "content": combined_data
+                    "content": paginated_data
                 }
             }, status=status.HTTP_200_OK)
 
@@ -206,13 +242,24 @@ class HomeFollowPliView(APIView):
             Q(user=user)  
         ).order_by('-created_at')
 
-        serializers = PliSerializer(plis, many=True)
+
+        paginator = TenItemPagination()
+        paginated_plis = paginator.paginate_queryset(plis, request)
+        serializers = PliSerializer(paginated_plis, many=True)
+
 
         unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
         notify = True if unread_notifications else False
 
+        total_items = paginator.page.paginator.count
+        current_page = paginator.page.number
+        total_pages = paginator.page.paginator.num_pages
+
         return Response({
                 "message": "팔로우 플리 홈 조회",
+                "total_items": total_items,
+                "current_page":current_page,
+                "total_pages":total_pages,
                 "data": {
                     "notify": notify,
                     "content": serializers.data
@@ -238,14 +285,23 @@ class HomeFollowNoteView(APIView):
             Q(user__in=friends, visibility='friends') |  # 친구가 작성한 노트
             Q(user=user)  # 자신이 작성한 노트
         ).order_by('-created_at')
-        
-        serializers = NoteSerializer(notes, many=True)
+
+        paginator = TenItemPagination()
+        paginated_notes = paginator.paginate_queryset(notes, request)
+        serializers = NoteSerializer(paginated_notes, many=True)
 
         unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
         notify = True if unread_notifications else False
 
+        total_items = paginator.page.paginator.count
+        current_page = paginator.page.number
+        total_pages = paginator.page.paginator.num_pages
+
         return Response({
                 "message": "팔로우 노트 홈 조회",
+                "total_items": total_items,
+                "current_page":current_page,
+                "total_pages":total_pages,
                 "data": {
                     "notify": notify,
                     "content": serializers.data

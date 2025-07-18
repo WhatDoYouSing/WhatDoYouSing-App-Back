@@ -29,20 +29,29 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-#SECRET_KEY = 'django-insecure-gz$1utuaxv6gr*&fa*2+3^_cgr9gqu4#4w3ju!=c)^^#%rtqwk'
+SECRET_KEY=env('DJANGO_SECRET_KEY')
+# DEBUG = env('DEBUG')
+KAKAO_CLIENT_ID=env('KAKAO_CLIENT_ID')
+KAKAO_APP_ID=env('KAKAO_APP_ID')
+KAKAO_CLIENT_SECRET_KEY=env('KAKAO_CLIENT_SECRET_KEY')
 
-SECRET_KEY = env('DJANGO_SECRET_KEY')
-DEBUG = env('DEBUG')
-KAKAO_CLIENT_ID = env('KAKAO_CLIENT_ID')
-KAKAO_APP_ID = env('KAKAO_APP_ID')
-KAKAO_CLIENT_SECRET_KEY = env('KAKAO_CLIENT_SECRET_KEY')
+GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
+GOOGLE_SECRET=env('GOOGLE_SECRET')
+GOOGLE_CALLBACK_URI=env('GOOGLE_CALLBACK_URI')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = True
+EMAIL_BACKEND=env('EMAIL_BACKEND')
+EMAIL_HOST=env('EMAIL_HOST')
+EMAIL_PORT=env('EMAIL_PORT')
+EMAIL_HOST_USER=env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD=env('EMAIL_HOST_PASSWORD')
+EMAIL_USE_TLS=True
+DEFAULT_FROM_EMAIL=EMAIL_HOST_USER
+
+GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
+GOOGLE_SECRET=env('GOOGLE_SECRET')
+GOOGLE_CALLBACK_URI=env('GOOGLE_CALLBACK_URI')
 
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -56,7 +65,8 @@ INSTALLED_APPS = [
 
     'corsheaders',
 
-    'rest_auth',
+    #'rest_auth',
+    'dj_rest_auth',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -66,8 +76,9 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
-    'rest_auth.registration',
+    'dj_rest_auth.registration',
     'allauth.socialaccount.providers.kakao',
+    'allauth.socialaccount.providers.google',
 
     'accounts',
     'collects',
@@ -113,6 +124,11 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware', # 추가
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
 # cors 
 CORS_ORIGIN_ALLOW_ALL=True
 CORS_ALLOW_CREDENTIALS = True
@@ -142,7 +158,7 @@ ROOT_URLCONF = 'WDYS.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -161,12 +177,12 @@ WSGI_APPLICATION = 'WDYS.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 
 # Password validation
@@ -204,6 +220,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

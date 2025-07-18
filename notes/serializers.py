@@ -1,42 +1,55 @@
 from rest_framework import serializers
-from notes.models import *
-from accounts.models import *
-from accounts.serializers import UserSerializer
-from datetime import datetime, timedelta
-
-from rest_framework import serializers
-from .models import Notes, Plis
+from .models import NoteComment, NoteReply
 
 
-class NotesSerializer(serializers.ModelSerializer):
-    type = serializers.SerializerMethodField()  # 동적 필드 추가
+class NoteReplySerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+    likes_count = serializers.SerializerMethodField()
 
     class Meta:
-        model = Notes
+        model = NoteReply
+        fields = ["id", "user", "created_at", "content", "likes_count", "mention"]
+
+    def get_user(self, obj):
+        return {
+            "id": obj.user.id,
+            "username": obj.user.serviceID,
+            "nickname": obj.user.nickname,
+            "profile": obj.user.profile,
+        }
+
+    def get_likes_count(self, obj):
+        return obj.likes.count()
+
+
+class NoteCommentSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+    replies = NoteReplySerializer(many=True, read_only=True)  # 대댓글 포함
+    likes_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NoteComment
         fields = [
             "id",
-            "song_title",
-            "artist",
-            "album_art",
-            "memo",
+            "user",
             "created_at",
-            "type",
+            "content",
+            "reply_count",
+            "replies",
+            "likes_count",
         ]
 
-    def get_type(self, obj):
-        return "note"  # Notes는 "note"로 반환
+    def get_user(self, obj):
+        return {
+            "id": obj.user.id,
+            "username": obj.user.serviceID,
+            "nickname": obj.user.nickname,
+            "profile": obj.user.profile,
+        }
 
+    def get_reply_count(self, obj):
+        return obj.replies.count()  # 대댓글 개수 반환
 
-class PlisSerializer(serializers.ModelSerializer):
-    type = serializers.SerializerMethodField()  # 동적 필드 추가
-    notes_count = serializers.SerializerMethodField()  # 포함된 노트 개수 추가
-
-    class Meta:
-        model = Plis
-        fields = ["id", "title", "user", "created_at", "notes_count", "type"]
-
-    def get_type(self, obj):
-        return "pli"  # Plis는 "pli"로 반환
-
-    def get_notes_count(self, obj):
-        return obj.plis.count()  # 해당 플리에 포함된 노트 개수
+    def get_likes_count(self, obj):
+        return obj.likes.count()

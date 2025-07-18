@@ -1,0 +1,68 @@
+###########
+# BUILDER #
+###########
+
+FROM python:3.8.3-alpine as builder
+
+WORKDIR /usr/src/app
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# 필수 빌드 패키지 설치
+RUN apk add --no-cache \
+    python3-dev \
+    mariadb-dev \
+    build-base \
+    libffi-dev \
+    openssl-dev \
+    jpeg-dev \
+    zlib-dev \
+    linux-headers \
+    curl
+
+# pip 최신화
+RUN pip install --upgrade pip setuptools wheel
+
+# requirements 복사 및 wheel 생성 (전체)
+COPY ./requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /usr/src/app/wheels -r requirements.txt
+
+#########
+# FINAL #
+#########
+FROM python:3.8.3-alpine
+
+RUN addgroup -S app && adduser -S app -G app
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/web
+RUN mkdir -p $APP_HOME/static $APP_HOME/media
+WORKDIR $APP_HOME
+
+# 런타임 패키지 (필요한 라이브러리만) ----------------------------------------
+RUN apk add --no-cache \
+    libpq \
+    libffi \
+    openssl \
+    jpeg \
+    zlib \
+    mariadb-dev \
+    gcc \
+    musl-dev \
+    python3-dev
+
+# pip 버전 업그레이드 ---------------------------------------------------------
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# 빌더 단계 결과 복사 ---------------------------------------------------------
+COPY --from=builder /usr/src/app/wheels /wheels
+COPY --from=builder /usr/src/app/requirements.txt .
+
+# 로컬 wheel만 사용해 의존성 설치 -------------------------------------------
+RUN pip install --no-index --find-links=/wheels -r requirements.txt
+
+# 프로젝트 복사 및 권한 설정 ---------------------------------------------------
+COPY ./config/docker/entrypoint.prod.sh $APP_HOME
+COPY . $APP_HOME
+RUN chown -R app:app $APP_HOME
+USER app

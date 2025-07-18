@@ -97,7 +97,9 @@ class Notes(models.Model):
     # archive_count = models.IntegerField(default=0)  # 보관 수
 
     def __str__(self):
-        return self.song_title
+        return (
+            f"{self.id}. {self.user.nickname} - {self.song_title} ({self.visibility})"
+        )
 
 
 # 노트에 다른 사용자가 감정 등록
@@ -218,6 +220,9 @@ class NoteReply(models.Model):
         verbose_name="대댓글 작성자",
         related_name="note_replies",
     )
+    mention = models.CharField(
+        max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True
+    )
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
@@ -274,6 +279,9 @@ class PliReply(models.Model):
         verbose_name="대댓글 작성자",
         related_name="pli_replies",
     )
+    mention = models.CharField(
+        max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True
+    )
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
@@ -287,3 +295,36 @@ class PliReply(models.Model):
 
     def __str__(self):
         return f"대댓글: {self.user.username} - {self.content[:20]}"
+
+
+class CommentReport(models.Model):
+    REPORT_TYPE_CHOICES = [
+        ("note comment", "note comment"),
+        ("note reply", "note reply"),
+        ("playlist comment", "playlist comment"),
+        ("playlist reply", "playlist reply"),
+    ]
+    report_user = models.ForeignKey(
+        User,
+        verbose_name="신고 유저",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="reports_made",
+    )
+    issue_user = models.ForeignKey(
+        User,
+        verbose_name="위험 유저",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="reports_received",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    content = models.TextField(verbose_name="댓글/대댓글 내용")
+    reason = models.TextField(verbose_name="신고 사유")
+    type = models.CharField(
+        max_length=20, choices=REPORT_TYPE_CHOICES, default="note comment"
+    )
+    content_id = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.report_user} -> {self.issue_user} ({self.type})"
