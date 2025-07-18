@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import User
+
 # Create your models here.
 
 
@@ -59,7 +60,9 @@ class Notes(models.Model):
     song_title = models.CharField(max_length=200)  # 노래 제목(유튜브 영상 제목)
     artist = models.CharField(max_length=200)  # 아티스트 이름(유튜브 채널명)
     lyrics = models.TextField(null=True, blank=True)
-    link = models.CharField(max_length=200)  # 관련 링크(유튜브 URL 등)
+    link = models.CharField(
+        max_length=200, null=True, blank=True
+    )  # 관련 링크(유튜브 URL 등)
     memo = models.TextField()  # 노트 내용(메모)
     visibility = models.CharField(
         max_length=10, choices=VISIBILITY_CHOICES, default="public"
@@ -94,26 +97,21 @@ class Notes(models.Model):
     # archive_count = models.IntegerField(default=0)  # 보관 수
 
     def __str__(self):
-        return f"{self.id}. {self.user.nickname} - {self.song_title} ({self.visibility})"
+        return (
+            f"{self.id}. {self.user.nickname} - {self.song_title} ({self.visibility})"
+        )
+
 
 # 노트에 다른 사용자가 감정 등록
 class NoteEmotion(models.Model):
-    note = models.ForeignKey(
-        Notes, 
-        on_delete=models.CASCADE,
-        verbose_name="노트"
-    )
+    note = models.ForeignKey(Notes, on_delete=models.CASCADE, verbose_name="노트")
     user = models.ForeignKey(
-        "accounts.User",  
-        on_delete=models.CASCADE,
-        verbose_name="사용자"
+        "accounts.User", on_delete=models.CASCADE, verbose_name="사용자"
     )
-    emotion = models.ForeignKey(
-        Emotions,  
-        on_delete=models.CASCADE,
-        verbose_name="감정"
+    emotion = models.ForeignKey(Emotions, on_delete=models.CASCADE, verbose_name="감정")
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name="감정을 남긴 날짜"
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="감정을 남긴 날짜")
 
     class Meta:
         db_table = "note_emotions"
@@ -122,7 +120,6 @@ class NoteEmotion(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.emotion.name} on {self.note.song_title}"
-
 
 
 class Plis(models.Model):
@@ -182,26 +179,23 @@ class PliNotes(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)  # 추가 날짜
 
 
-
 class NoteComment(models.Model):
     note = models.ForeignKey(
-        Notes, 
+        Notes,
         on_delete=models.CASCADE,
         verbose_name="대상 노트",
-        related_name="comments" 
+        related_name="comments",
     )
     user = models.ForeignKey(
-        User, 
+        User,
         on_delete=models.CASCADE,
         verbose_name="댓글 작성자",
-        related_name="note_comments"  
+        related_name="note_comments",
     )
     content = models.TextField(verbose_name="댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_note_comments"  
+        User, verbose_name="좋아요", related_name="liked_note_comments"
     )
 
     class Meta:
@@ -215,24 +209,24 @@ class NoteComment(models.Model):
 
 class NoteReply(models.Model):
     comment = models.ForeignKey(
-        NoteComment,  
+        NoteComment,
         on_delete=models.CASCADE,
         verbose_name="부모 댓글",
-        related_name="replies"  
+        related_name="replies",
     )
     user = models.ForeignKey(
-        User, 
+        User,
         on_delete=models.CASCADE,
         verbose_name="대댓글 작성자",
-        related_name="note_replies"  
+        related_name="note_replies",
     )
-    mention = models.CharField(max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True)
+    mention = models.CharField(
+        max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True
+    )
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_note_replies"  
+        User, verbose_name="좋아요", related_name="liked_note_replies"
     )
 
     class Meta:
@@ -249,20 +243,18 @@ class PliComment(models.Model):
         Plis,
         on_delete=models.CASCADE,
         verbose_name="대상 플리",
-        related_name="comments"  
+        related_name="comments",
     )
     user = models.ForeignKey(
-        User,  
+        User,
         on_delete=models.CASCADE,
         verbose_name="댓글 작성자",
-        related_name="pli_comments" 
+        related_name="pli_comments",
     )
     content = models.TextField(verbose_name="댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_pli_comments"  
+        User, verbose_name="좋아요", related_name="liked_pli_comments"
     )
 
     class Meta:
@@ -279,21 +271,21 @@ class PliReply(models.Model):
         PliComment,
         on_delete=models.CASCADE,
         verbose_name="부모 댓글",
-        related_name="replies"  
+        related_name="replies",
     )
     user = models.ForeignKey(
         User,  # User 모델 참조
         on_delete=models.CASCADE,
         verbose_name="대댓글 작성자",
-        related_name="pli_replies" 
+        related_name="pli_replies",
     )
-    mention = models.CharField(max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True)
+    mention = models.CharField(
+        max_length=50, verbose_name="멘션 닉네임", default="", null=True, blank=True
+    )
     content = models.TextField(verbose_name="대댓글 내용")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="작성 날짜")
     likes = models.ManyToManyField(
-        User, 
-        verbose_name="좋아요",
-        related_name="liked_pli_replies"  
+        User, verbose_name="좋아요", related_name="liked_pli_replies"
     )
 
     class Meta:
@@ -304,10 +296,11 @@ class PliReply(models.Model):
     def __str__(self):
         return f"대댓글: {self.user.username} - {self.content[:20]}"
 
+
 class CommentReport(models.Model):
     REPORT_TYPE_CHOICES = [
-        ("note comment", "note comment"),  
-        ("note reply", "note reply"),  
+        ("note comment", "note comment"),
+        ("note reply", "note reply"),
         ("playlist comment", "playlist comment"),
         ("playlist reply", "playlist reply"),
     ]
