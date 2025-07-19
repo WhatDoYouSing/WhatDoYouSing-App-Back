@@ -6,4 +6,6 @@ urlpatterns = [
     path("notice/<int:pk>/", NoticeDetailView.as_view()), 
     path("faq/", FAQListView.as_view()),
     path("faq/<int:pk>/", FAQDetailView.as_view()),
+    path("change/push/", PushChangeView.as_view()),
+    path("change/marketing/", MarketingChangeView.as_view()),
 ]

@@ -1,5 +1,3 @@
-# 배포용 잠시 비활성화
-
 '''
 from konlpy.tag import Okt
 import spacy, re

@@ -28,8 +28,12 @@ import WDYS
 import requests
 import allauth
 import string
+import os
+import time
+import jwt
 
 #BASE_URL = 'http://localhost:8000/'
+#BASE_URL = 'https://05b17e3d7f3c.ngrok-free.app/'
 BASE_URL = 'http://3.39.188.131/'
 
 KAKAO_CONFIG = {
@@ -41,6 +45,10 @@ KAKAO_CONFIG = {
 kakao_login_uri = "https://kauth.kakao.com/oauth/authorize"
 kakao_token_uri = "https://kauth.kakao.com/oauth/token"
 kakao_profile_uri = "https://kapi.kakao.com/v2/user/me"
+
+APPLE_BASE_URL = "https://appleid.apple.com"
+APPLE_AUTH_URL = "https://appleid.apple.com/auth/authorize"
+APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
 
 # Create your views here.
 
@@ -447,3 +455,103 @@ class GoogleLoginView(views.APIView):
         )
 
         return redirect(uri)
+    
+# 애플 유저 ############################################################################################        
+
+# ✅ [Apple] 로그인 요청
+class AppleLoginView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        client_id = settings.APPLE_CLIENT_ID
+        redirect_uri = settings.APPLE_REDIRECT_URI
+
+        uri = (
+            f"https://appleid.apple.com/auth/authorize"
+            f"?client_id={client_id}"
+            f"&redirect_uri={redirect_uri}"
+            f"&response_type=code"
+            f"&scope=name email"
+            f"&response_mode=form_post"
+        )
+
+        return redirect(uri)
+
+# 📌 [Apple] 로그인 콜백 및 처리
+class AppleCallbackView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        return self.get(request)
+
+    def generate_client_secret(self):
+        headers = {
+            'alg': 'ES256',
+            'kid': settings.APPLE_KEY_ID,
+        }
+        payload = {
+            'iss': settings.APPLE_TEAM_ID,
+            'iat': int(time.time()),
+            'exp': int(time.time()) + 600,
+            'aud': "https://appleid.apple.com",
+            'sub': settings.APPLE_CLIENT_ID,
+        }
+        client_secret = jwt.encode(
+            payload,
+            settings.APPLE_PRIVATE_KEY,
+            algorithm='ES256',
+            headers=headers
+        )
+        return client_secret
+
+    def get(self, request):
+        code = request.query_params.get("code") or request.data.get("code")
+        if not code:
+            return Response({'error': 'Authorization code missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+        client_secret = self.generate_client_secret()
+
+        token_data = {
+            'client_id': settings.APPLE_CLIENT_ID,
+            'client_secret': client_secret,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': settings.APPLE_REDIRECT_URI,
+        }
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        token_res = requests.post("https://appleid.apple.com/auth/token", data=token_data, headers=headers)
+        token_json = token_res.json()
+
+        id_token = token_json.get("id_token")
+        if not id_token:
+            return Response({'error': 'id_token missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ⚠️ 서명 검증 비활성화 (개발용)
+        decoded = jwt.decode(id_token, options={"verify_signature": False})
+        sub = decoded.get("sub")
+        email = decoded.get("email")
+
+        if not sub or not email:
+            return Response({'error': 'Invalid id_token'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 로그인 or 회원가입
+        social_type = 'apple'
+        social_id = f"{social_type}_{sub}"
+
+        try:
+            user = User.objects.get(username=social_id)
+            data = {'username': social_id, 'password': social_id}
+            serializer = ALogInSerializer(data=data)
+            if serializer.is_valid():
+                return Response({'message': '애플 로그인 성공', 'data': serializer.validated_data}, status=status.HTTP_200_OK)
+            return Response({'message': '애플 로그인 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        except User.DoesNotExist:
+            data = {'username': social_id, 'password': social_id}
+            serializer = ASignUpSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                serializer2 = ALogInSerializer(data=data)
+                if serializer2.is_valid():
+                    return Response({'message': '애플 회원가입 성공', 'data': serializer2.validated_data}, status=status.HTTP_201_CREATED)
+            return Response({'message': '애플 회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

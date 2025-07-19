@@ -29,4 +29,8 @@ urlpatterns = [
     # ✅ [구글] OAuth 회원가입 & 로그인
     path("google/", GoogleLoginView.as_view()),
     path("google/callback/", GoogleCallbackView.as_view()),
+
+    # ✅ [애플] OAuth 회원가입 & 로그인
+    path("apple/", AppleLoginView.as_view()),
+    path("apple/callback/", AppleCallbackView.as_view()),
 ]
