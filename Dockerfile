@@ -8,7 +8,7 @@ WORKDIR /app
 # 시스템 의존성
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
-        pkg-config \    
+        pkg-config \
         openjdk-17-jdk-headless \
         default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --upgrade pip \
  && pip install --prefer-binary -r requirements.txt \
- && python -m spacy download en_core_web_sm \
  && apt-get purge -y --auto-remove build-essential
 
 COPY . .
