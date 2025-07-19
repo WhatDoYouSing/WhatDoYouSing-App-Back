@@ -1,3 +1,4 @@
+'''
 from konlpy.tag import Okt
 import spacy, re
 
@@ -13,3 +14,4 @@ def extract_nouns(text: str) -> list[str]:
     en = [tok.lemma_ for tok in _en(text) if tok.pos_ == "NOUN"]
     words = [_normalize(w) for w in (*ko, *en)]
     return [w for w in words if w]  # 빈 문자열 제거
+'''

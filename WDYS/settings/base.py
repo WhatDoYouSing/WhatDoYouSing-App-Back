@@ -51,13 +51,19 @@ GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
 GOOGLE_SECRET=env('GOOGLE_SECRET')
 GOOGLE_CALLBACK_URI=env('GOOGLE_CALLBACK_URI')
 
-#APPLE_TEAM_ID=env('APPLE_TEAM_ID')
-#APPLE_CLIENT_ID=env('APPLE_CLIENT_ID')
-#APPLE_REDIRECT_URI=env('APPLE_REDIRECT_URI')
-#APPLE_KEY_ID=env('APPLE_KEY_ID')
-#APPLE_PRIVATE_KEY=env('APPLE_PRIVATE_KEY')
+APPLE_TEAM_ID=env('APPLE_TEAM_ID')
+APPLE_CLIENT_ID=env('APPLE_CLIENT_ID')
+APPLE_REDIRECT_URI=env('APPLE_REDIRECT_URI')
+APPLE_KEY_ID=env('APPLE_KEY_ID')
+APPLE_KEY_PATH = os.getenv("APPLE_KEY_PATH")
+APPLE_PRIVATE_KEY = None
 
-ALLOWED_HOSTS = ['*']
+if APPLE_KEY_PATH:
+    key_full_path = os.path.join(BASE_DIR, APPLE_KEY_PATH)
+    with open(key_full_path, 'r') as f:
+        APPLE_PRIVATE_KEY = f.read()
+
+ALLOWED_HOSTS = ['*', '05b17e3d7f3c.ngrok-free.app']
 
 # Application definition
 
@@ -134,6 +140,10 @@ MIDDLEWARE = [
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://05b17e3d7f3c.ngrok-free.app'
 ]
 
 # cors 

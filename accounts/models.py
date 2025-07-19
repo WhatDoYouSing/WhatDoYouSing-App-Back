@@ -15,7 +15,7 @@ class Title(models.Model):
     def __str__(self):
         return self.name  # 관리자 페이지 등에서 이름으로 표시
  
-class User(AbstractUser):
+class User(AbstractUser):  
     email = models.EmailField(unique=True, verbose_name="이메일 주소", null=True, blank=True)
     username = models.CharField(max_length=150, unique=True, verbose_name="아이디")
     serviceID = models.CharField(max_length=150, unique=True, verbose_name="서비스 내 아이디",null=True,blank=True)

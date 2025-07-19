@@ -327,3 +327,47 @@ class GLogInSerializer(serializers.Serializer):
             'access_token': str(token.access_token),
             'refresh_token': str(token),
         }
+    
+# 애플 유저 ############################################################################################   
+
+# 📌 애플 회원가입 Serializer
+class ASignUpSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'password']
+
+    def create(self, validated_data):
+        user = User.objects.create(
+            username=validated_data['username'],
+            auth_provider="apple",
+        )
+        user.set_password(validated_data['password'])
+        user.save()
+        return user
+
+# 📌 애플 로그인 Serializer
+class ALogInSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(max_length=128, write_only=True)
+
+    def validate(self, data):
+        username = data.get("username")
+        password = data.get("password")
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError('존재하지 않는 사용자입니다.')
+
+        if not user.check_password(password):
+            raise serializers.ValidationError('잘못된 비밀번호입니다.')
+
+        token = RefreshToken.for_user(user)
+        return {
+            'id': user.id,
+            'username': user.username,
+            'nickname': user.nickname,
+            'profile': user.profile,
+            'access_token': str(token.access_token),
+            'refresh_token': str(token),
+        }
