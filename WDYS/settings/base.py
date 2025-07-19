@@ -55,15 +55,17 @@ APPLE_TEAM_ID=env('APPLE_TEAM_ID')
 APPLE_CLIENT_ID=env('APPLE_CLIENT_ID')
 APPLE_REDIRECT_URI=env('APPLE_REDIRECT_URI')
 APPLE_KEY_ID=env('APPLE_KEY_ID')
-APPLE_KEY_PATH = os.getenv("APPLE_KEY_PATH")
-APPLE_PRIVATE_KEY = None
+#APPLE_KEY_PATH = os.getenv("APPLE_KEY_PATH")
+APPLE_PRIVATE_KEY = os.environ.get("APPLE_PRIVATE_KEY")
 
+'''
 if APPLE_KEY_PATH:
     key_full_path = os.path.join(BASE_DIR, APPLE_KEY_PATH)
     with open(key_full_path, 'r') as f:
         APPLE_PRIVATE_KEY = f.read()
+'''        
 
-ALLOWED_HOSTS = ['*', '05b17e3d7f3c.ngrok-free.app']
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
