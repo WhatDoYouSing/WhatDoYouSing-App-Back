@@ -255,3 +255,35 @@ class PliUploadSerializer(serializers.ModelSerializer):
             )
 
         return plis
+
+    def update(self, instance, validated_data):
+        # 1) 중첩 plinotes 데이터 꺼내기
+        plinotes_data = validated_data.pop("plinotes", None)
+
+        # 2) 기본 필드 (title, visibility) 업데이트
+        for attr in ("title", "visibility"):
+            if attr in validated_data:
+                setattr(instance, attr, validated_data.pop(attr))
+        instance.save()
+
+        # 3) M2M 태그들 업데이트
+        if "tag_time" in validated_data:
+            instance.tag_time.set(validated_data.pop("tag_time"))
+        if "tag_season" in validated_data:
+            instance.tag_season.set(validated_data.pop("tag_season"))
+        if "tag_context" in validated_data:
+            instance.tag_context.set(validated_data.pop("tag_context"))
+
+        # 4) plinotes 중첩 처리
+        if plinotes_data is not None:
+            # (기존 관계 모두 날리고)
+            instance.plinotes.all().delete()
+            # (새로 받은 것들로 만들기)
+            for item in plinotes_data:
+                PliNotes.objects.create(
+                    plis=instance,
+                    notes=item["notes"],
+                    note_memo=item["note_memo"],
+                )
+
+        return instance
