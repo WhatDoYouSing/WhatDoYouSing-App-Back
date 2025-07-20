@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import NoteComment, NoteReply
 
+
 class NoteReplySerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
@@ -14,7 +15,7 @@ class NoteReplySerializer(serializers.ModelSerializer):
             "id": obj.user.id,
             "username": obj.user.serviceID,
             "nickname": obj.user.nickname,
-            "profile": obj.user.profile
+            "profile": obj.user.profile,
         }
 
     def get_likes_count(self, obj):
@@ -29,14 +30,22 @@ class NoteCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NoteComment
-        fields = ["id", "user", "created_at", "content", "reply_count", "replies", "likes_count"]
+        fields = [
+            "id",
+            "user",
+            "created_at",
+            "content",
+            "reply_count",
+            "replies",
+            "likes_count",
+        ]
 
     def get_user(self, obj):
         return {
             "id": obj.user.id,
             "username": obj.user.serviceID,
             "nickname": obj.user.nickname,
-            "profile": obj.user.profile
+            "profile": obj.user.profile,
         }
 
     def get_reply_count(self, obj):
