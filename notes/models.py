@@ -78,18 +78,16 @@ class Notes(models.Model):
         blank=True,
     )  # 감정
     tag_time = models.ManyToManyField(
-        Times, related_name="tag_time", null=True, blank=True
+        Times, related_name="tag_time", blank=True
     )  # 시간 태그
     tag_season = models.ManyToManyField(
         Seasons,
         related_name="tag_season",
-        null=True,
         blank=True,
     )  # 계절 태그
     tag_context = models.ManyToManyField(
         Contexts,
         related_name="tag_context",
-        null=True,
         blank=True,
     )  # 일상맥락 태그
 
@@ -146,19 +144,16 @@ class Plis(models.Model):
     tag_time = models.ManyToManyField(
         Times,
         related_name="pli_tag_time",
-        null=True,
         blank=True,
     )  # 시간 태그
     tag_season = models.ManyToManyField(
         Seasons,
         related_name="pli_tag_season",
-        null=True,
         blank=True,
     )  # 계절 태그
     tag_context = models.ManyToManyField(
         Contexts,
         related_name="pli_tag_context",
-        null=True,
         blank=True,
     )  # 일상맥락 태그
 

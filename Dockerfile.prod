@@ -66,3 +66,6 @@ COPY ./config/docker/entrypoint.prod.sh $APP_HOME
 COPY . $APP_HOME
 RUN chown -R app:app $APP_HOME
 USER app
+
+ENTRYPOINT ["sh", "config/docker/entrypoint.prod.sh"]
+CMD ["gunicorn", "WDYS.wsgi:application", "--bind", "0.0.0.0:8000"]
