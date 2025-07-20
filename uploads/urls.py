@@ -9,6 +9,7 @@ urlpatterns = [
     path("note/self/", NoteUploadView.as_view()),  # 노트(직접)업로드
     path("note/update/<int:pk>/", NoteUpdateView.as_view()),  # 노트 수정
     path("note/del/<int:pk>/", NoteDelView.as_view()),  # 노트 삭제
+    # path("pli/scrap/<int:scrap_list_id>/", ScrapNotesForPlisView.as_view()),  # 플리 생성 시 보관함 목록
     path("pli/notelist/", NoteListView.as_view()),  # 플리 생성 시 노트 목록
     path("pli/", PliUploadView.as_view()),  # 플리 업로드
     path("pli/update/<int:pk>/", PliUpdateView.as_view()),  # 플리 수정

@@ -15,6 +15,7 @@ from django.conf import settings
 
 from .serializers import *
 from notes.models import *
+from collects.models import ScrapList, ScrapNotes
 
 
 # 노트 업로드(음원)
@@ -214,6 +215,33 @@ class NoteListView(views.APIView):
             {"message": "MY 노트 목록 반환 성공", "data": serializer.data},
             status=status.HTTP_200_OK,
         )
+
+
+"""
+# 플리 생성 시 보관함 상세(노트만)
+class ScrapNotesForPlisView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, scrap_list_id, format=None):
+        # 1) 내가 소유한 보관함인지 확인
+        scrap_list = get_object_or_404(ScrapList, id=scrap_list_id, user=request.user)
+
+        # 2) 스크랩된 노트(collects.models.ScrapNotes)만 필터
+        scrap_notes = ScrapNotes.objects.filter(scrap_list=scrap_list)
+
+        # 3) content_id 필드에 저장된 Notes PK 리스트 추출
+        note_ids = scrap_notes.values_list("content_id", flat=True)
+
+        # 4) 실제 Notes 객체 조회
+        notes_qs = Notes.objects.filter(id__in=note_ids).order_by("-created_at")
+
+        # 5) 직렬화 후 응답
+        serializer = PliNotesSerializer(notes_qs, many=True)
+        return Response(
+            {"message": "보관함 내 노트 목록 반환 성공", "data": serializer.data},
+            status=status.HTTP_200_OK,
+        )
+"""
 
 
 # 플리 생성
