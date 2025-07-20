@@ -221,6 +221,86 @@ class SearchView(views.APIView):
                 plis_query &= user_query
             has_filter = True
 
+        # === (1) 기본 QuerySet 준비 ===
+        notes_qs = (
+            Notes.objects.filter(note_query).distinct()
+            if has_filter
+            else Notes.objects.all()
+        )
+        plis_qs = (
+            Plis.objects.filter(plis_query).distinct()
+            if has_filter
+            else Plis.objects.all()
+        )
+
+        me = request.user
+        if me.is_authenticated:
+            # === (2) 맞팔 여부 annotate ===
+            notes_qs = notes_qs.annotate(
+                is_following=Exists(
+                    UserFollows.objects.filter(
+                        follower=me, following=OuterRef("user_id")
+                    )
+                ),
+                is_follower=Exists(
+                    UserFollows.objects.filter(
+                        follower=OuterRef("user_id"), following=me
+                    )
+                ),
+            )
+            plis_qs = plis_qs.annotate(
+                is_following=Exists(
+                    UserFollows.objects.filter(
+                        follower=me, following=OuterRef("user_id")
+                    )
+                ),
+                is_follower=Exists(
+                    UserFollows.objects.filter(
+                        follower=OuterRef("user_id"), following=me
+                    )
+                ),
+            )
+
+            # === (3) visibility 필터 ===
+            note_vis_q = (
+                Q(visibility="public")
+                | Q(visibility="private", user=me)
+                | Q(visibility="friends", is_following=True, is_follower=True)
+            )
+            plis_vis_q = (
+                Q(visibility="public")
+                | Q(visibility="private", user=me)
+                | Q(visibility="friends", is_following=True, is_follower=True)
+            )
+
+            notes_results = notes_qs.filter(note_vis_q)
+            plis_results = plis_qs.filter(plis_vis_q)
+        else:
+            # 비로그인: public 만
+            notes_results = notes_qs.filter(visibility="public")
+            plis_results = plis_qs.filter(visibility="public")
+
+        # === (4) 직렬화 및 응답 (기존 코드 그대로) ===
+        data = {
+            "Memo": SearchAllMemoNotesSerializer(notes_results, many=True).data
+            + SearchAllPlisSerializer(plis_results, many=True).data,
+            "Lyrics": SearchAllNotesLSSSerializer(notes_results, many=True).data,
+            "SongTitle": SearchAllNotesLSSSerializer(notes_results, many=True).data
+            + SearchAllPlisSSPSerializer(plis_results, many=True).data,
+            "Singer": SearchAllNotesLSSSerializer(notes_results, many=True).data
+            + SearchAllPlisSSPSerializer(plis_results, many=True).data,
+            "Location": SearchAllNotesLocationSerializer(notes_results, many=True).data,
+            "PlisTitle": SearchAllPlisSSPSerializer(plis_results, many=True).data,
+        }
+        filtered_data = (
+            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
+        )
+
+        return Response(
+            {"message": "탐색결과 통합 조회 성공", "data": filtered_data},
+            status=status.HTTP_200_OK,
+        )
+        """
         # 검색 실행
         notes_results = (
             Notes.objects.filter(note_query).distinct()
@@ -255,6 +335,7 @@ class SearchView(views.APIView):
             {"message": "탐색결과 통합 조회 성공", "data": filtered_data},
             status=status.HTTP_200_OK,
         )
+    """
 
 
 """
@@ -533,7 +614,7 @@ class SearchNotesView(views.APIView):
             else:
                 query &= user_query
             has_filter = True
-
+        """
         # ✅ 검색 실행
         search_results = (
             Notes.objects.filter(query).distinct()
@@ -593,6 +674,77 @@ class SearchNotesView(views.APIView):
             data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
         )
 
+        return Response(
+            {"message": "탐색결과 노트 조회 성공", "data": filtered_data},
+            status=status.HTTP_200_OK,
+        )
+        """
+        # --- visibility 필터 추가 ---
+        vis_q = Q(visibility="public")
+        if request.user.is_authenticated:
+            # 내가 팔로우한 사람들의 노트 (friends)
+            following_ids = UserFollows.objects.filter(
+                follower=request.user
+            ).values_list("following_id", flat=True)
+            vis_q |= Q(visibility="friends", user__in=following_ids)
+            # 내가 쓴 모든 노트 (private 포함)
+            vis_q |= Q(user=request.user)
+        # vis_q 완성
+
+        # --- 검색 실행 시 visibility도 함께 걸기 ---
+        base_q = query & vis_q if has_filter else vis_q
+        search_results = Notes.objects.filter(base_q).distinct()
+
+        # --- 나머지 결과 그룹핑 & 응답 조립 ---
+        data = {
+            "Memo": SearchNotesMemoSerializer(
+                (
+                    search_results.filter(memo__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "Lyrics": SearchNotesLTSSerializer(
+                (
+                    search_results.filter(lyrics__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "Title": SearchNotesLTSSerializer(
+                (
+                    search_results.filter(song_title__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "Singer": SearchNotesLTSSerializer(
+                (
+                    search_results.filter(artist__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "Location": SearchNotesLocationSerializer(
+                (
+                    search_results.filter(
+                        Q(location_name__icontains=keyword)
+                        | Q(location_address__icontains=keyword)
+                    )
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+        }
+
+        filtered_data = (
+            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
+        )
         return Response(
             {"message": "탐색결과 노트 조회 성공", "data": filtered_data},
             status=status.HTTP_200_OK,
@@ -734,7 +886,7 @@ class SearchPlisView(views.APIView):
             else:
                 query &= user_query
             has_filter = True
-
+        """
         # ✅ 검색 실행
         search_results = (
             Plis.objects.filter(query).distinct() if has_filter else Plis.objects.all()
@@ -787,6 +939,80 @@ class SearchPlisView(views.APIView):
         }
 
         # ✅ 특정 필터가 있는 경우 해당 데이터만 반환
+        filtered_data = (
+            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
+        )
+
+        return Response(
+            {"message": "탐색결과 플리 조회 성공", "data": filtered_data},
+            status=status.HTTP_200_OK,
+        )
+        """
+        # --- visibility 필터 추가 ---
+        vis_q = Q(visibility="public")
+        if request.user.is_authenticated:
+            # 친구 공개: 내가 팔로우한 사람들의 플리
+            following_ids = UserFollows.objects.filter(
+                follower=request.user
+            ).values_list("following_id", flat=True)
+            vis_q |= Q(visibility="friends", user__in=following_ids)
+            # 나의 플리(비공개 포함)
+            vis_q |= Q(user=request.user)
+
+        # --- 최종 queryset 생성 ---
+        if has_filter:
+            base_q = query & vis_q
+        else:
+            base_q = vis_q
+
+        search_results = Plis.objects.filter(base_q).distinct()
+
+        # --- 결과 그룹핑 & 직렬화 (기존 로직) ---
+        data = {
+            "Memo": SearchPlisMemoSerializer(
+                (
+                    search_results.filter(plinotes__note_memo__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "Lyrics": SearchPlisLSSPSerializer(
+                (
+                    search_results.filter(plinotes__notes__lyrics__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "SongTitle": SearchPlisLSSPSerializer(
+                (
+                    search_results.filter(
+                        plinotes__notes__song_title__icontains=keyword
+                    )
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "Singer": SearchPlisLSSPSerializer(
+                (
+                    search_results.filter(plinotes__notes__artist__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+            "PlisTitle": SearchPlisLSSPSerializer(
+                (
+                    search_results.filter(title__icontains=keyword)
+                    if keyword
+                    else search_results
+                ),
+                many=True,
+            ).data,
+        }
+
         filtered_data = (
             data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
         )
