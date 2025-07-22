@@ -1,6 +1,7 @@
 import random
 from rest_framework import serializers
 from notes.models import *
+from .models import *
 from accounts.models import *
 from accounts.serializers import UserSerializer
 from datetime import datetime, timedelta
@@ -287,3 +288,29 @@ class PliUploadSerializer(serializers.ModelSerializer):
                 )
 
         return instance
+
+
+# 게시글 작성자 신고 시리얼라이저
+class UserReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserReport
+        fields = ["id", "issue_user", "reason", "created_at"]
+        read_only_fields = ["id", "created_at", "issue_user"]
+
+    def validate_reason(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("신고 사유를 입력해주세요.")
+        return value
+
+
+# 게시글 신고 시리얼라이저
+class PostReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostReport
+        fields = ["id", "report_type", "content_id", "reason", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def validate_reason(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("신고 사유를 입력해주세요.")
+        return value

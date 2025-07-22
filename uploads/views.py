@@ -14,6 +14,7 @@ from django.conf import settings
 # import datetime
 
 from .serializers import *
+from .models import *
 from notes.models import *
 from collects.models import ScrapList, ScrapNotes
 
@@ -343,3 +344,77 @@ class PliDelView(views.APIView):
             return Response(
                 {"message": "권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN
             )
+
+
+class UserReportView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, post_id):
+        """
+        POST /api/reports/user/{post_id}/
+        {
+          "reason": "신고 사유 텍스트"
+        }
+        """
+        # 1) 게시글 조회 (노트 또는 플리 중 하나)
+        #    필요하다면 두 개 endpoint(노트용/플리용)으로 분리하거나,
+        #    report_type을 추가 파라미터로 받을 수도 있습니다.
+        target = None
+        if Notes.objects.filter(pk=post_id).exists():
+            target = get_object_or_404(Notes, pk=post_id)
+        else:
+            target = get_object_or_404(Plis, pk=post_id)
+
+        # 2) 작성자 본인 여부 확인
+        if target.user != request.user:
+            return Response(
+                {"message": "게시글 작성자만 신고할 수 있습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 3) 시리얼라이징 및 저장
+        serializer = UserReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report = serializer.save(
+            report_user=request.user,
+            issue_user=target.user,  # = request.user 이긴 하지만, 논리적 흐름상 명시
+        )
+
+        return Response(
+            {
+                "message": f"사용자 {target.user.username}님이 신고되었습니다.",
+                "report_id": report.id,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PostReportView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, report_type, content_id):
+        # 1) report_type 검증
+        if report_type not in [PostReport.REPORT_NOTE, PostReport.REPORT_PLI]:
+            return Response(
+                {"message": "유효하지 않은 report_type 입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2) 대상 게시글 조회 (404 처리)
+        Model = Notes if report_type == PostReport.REPORT_NOTE else Plis
+        target = get_object_or_404(Model, pk=content_id)
+
+        # 3) 시리얼라이징 및 저장
+        data = {
+            "report_type": report_type,
+            "content_id": content_id,
+            "reason": request.data.get("reason", ""),
+        }
+        serializer = PostReportSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        report = serializer.save(report_user=request.user, issue_user=target.user)
+
+        return Response(
+            {"message": f"{report_type}이(가) 신고되었습니다.", "report_id": report.id},
+            status=status.HTTP_201_CREATED,
+        )

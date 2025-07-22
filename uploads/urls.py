@@ -14,4 +14,8 @@ urlpatterns = [
     path("pli/", PliUploadView.as_view()),  # 플리 업로드
     path("pli/update/<int:pk>/", PliUpdateView.as_view()),  # 플리 수정
     path("pli/del/<int:pk>/", PliDelView.as_view()),  # 노트 삭제
+    path("report/user/<int:post_id>/", UserReportView.as_view()),  # 게시글 작성자 신고
+    path(
+        "report/<str:report_type>/<int:content_id>/", PostReportView.as_view()
+    ),  # 게시글 신고
 ]
