@@ -18,4 +18,9 @@ urlpatterns = [
     path(
         "report/<str:report_type>/<int:content_id>/", PostReportView.as_view()
     ),  # 게시글 신고
+    # 게시글 차단/해제
+    path("notes/block/<int:pk>/", BlockNoteView.as_view(), name="note-block"),
+    path("plis/block/<int:pk>/", BlockPliView.as_view(), name="pli-block"),
+    # 작성자 차단/해제
+    path("author-block/<int:user_id>/", BlockAuthorView.as_view(), name="author-block"),
 ]

@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import *
 from rest_framework import status, permissions
+from rest_framework import generics
 
 # from .permissions import *
 from rest_framework import views
@@ -15,6 +16,8 @@ from django.conf import settings
 
 from .serializers import *
 from .models import *
+from .permissions import *
+from .mixins import BlockFilterMixin
 from notes.models import *
 from collects.models import ScrapList, ScrapNotes
 
@@ -418,3 +421,56 @@ class PostReportView(views.APIView):
             {"message": f"{report_type}이(가) 신고되었습니다.", "report_id": report.id},
             status=status.HTTP_201_CREATED,
         )
+
+
+class BlockNoteView(generics.GenericAPIView):
+    serializer_class = NoteBlockSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        # serializer가 note_id 값을 검증
+        serializer = self.get_serializer(data={"note_id": pk})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "노트 차단 완료"}, status=201)
+
+    def delete(self, request, pk):
+        NoteBlock.objects.filter(user=request.user, note_id=pk).delete()
+        return Response({"message": "노트 차단 해제"}, status=204)
+
+
+class BlockPliView(generics.GenericAPIView):
+    serializer_class = PliBlockSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        serializer = self.get_serializer(data={"pli_id": pk})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "플리 차단 완료"}, status=201)
+
+    def delete(self, request, pk):
+        PliBlock.objects.filter(user=request.user, pli_id=pk).delete()
+        return Response({"message": "플리 차단 해제"}, status=204)
+
+
+# ───────────────────────────────── 작성자 차단/해제 ──────────────────────────
+class BlockAuthorView(generics.GenericAPIView):
+    """
+    공통 작성자 차단: 노트/플리 구분 없이 작성자 PK만 전달
+      POST   /uploads/author-block/{user_id}/
+      DELETE /uploads/author-block/{user_id}/
+    """
+
+    serializer_class = AuthorBlockSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id):
+        serializer = self.get_serializer(data={"blocked_user_id": user_id})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "작성자 차단 완료"}, status=201)
+
+    def delete(self, request, user_id):
+        UserBlock.objects.filter(user=request.user, blocked_user_id=user_id).delete()
+        return Response({"message": "작성자 차단 해제"}, status=204)

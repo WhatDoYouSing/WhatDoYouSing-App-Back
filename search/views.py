@@ -8,6 +8,7 @@ from social.models import UserFollows
 from accounts.models import User
 from notes.models import *
 from .serializers import *
+from uploads.mixins import BlockFilterMixin
 
 
 # 통합검색(전체)
@@ -233,6 +234,30 @@ class SearchView(views.APIView):
             else Plis.objects.all()
         )
 
+        # ────────────────────────────────────────────────
+        # ★★ 차단된 게시글·작성자 필터링 추가 ★★
+        # ────────────────────────────────────────────────
+        if request.user.is_authenticated:
+            u = request.user
+            blocked_note_ids = NoteBlock.objects.filter(user=u).values_list(
+                "note_id", flat=True
+            )
+            blocked_pli_ids = PliBlock.objects.filter(user=u).values_list(
+                "pli_id", flat=True
+            )
+            blocked_user_ids = UserBlock.objects.filter(user=u).values_list(
+                "blocked_user_id", flat=True
+            )
+
+            if blocked_note_ids:
+                notes_qs = notes_qs.exclude(id__in=blocked_note_ids)
+            if blocked_pli_ids:
+                plis_qs = plis_qs.exclude(id__in=blocked_pli_ids)
+
+            if blocked_user_ids:
+                notes_qs = notes_qs.exclude(user_id__in=blocked_user_ids)
+                plis_qs = plis_qs.exclude(user_id__in=blocked_user_ids)
+
         me = request.user
         if me.is_authenticated:
             # === (2) 맞팔 여부 annotate ===
@@ -336,164 +361,6 @@ class SearchView(views.APIView):
             status=status.HTTP_200_OK,
         )
     """
-
-
-"""
-# 통합검색(전체)
-class SearchView(views.APIView):
-    def get(self, request):
-        keyword = request.GET.get("keyword", "").strip()  # strip으로 공백 제거
-        writer = request.GET.get("writer", "").strip()  # strip으로 공백 제거
-        totaltag = request.GET.getlist("totaltag")  # 여러 개 태그 검색 가능
-        filter_type = request.GET.get("filter", "").strip()  # default: 전체 검색
-
-        if not filter_type:  # 빈 문자열일 경우 전체 결과 반환
-            filter_type = "all"
-
-        valid_filters = [
-            "all",
-            "Memo",
-            "Lyrics",
-            "SongTitle",
-            "Singer",
-            "Location",
-            "PlisTitle",
-        ]
-        if filter_type not in valid_filters:
-            return Response(
-                {
-                    "message": "잘못된 필터 값입니다. 허용된 필터: all, Memo, Lyrics, SongTitle, Singer, Location, PliTitle"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        note_query = Q()
-        plis_query = Q()
-        user_query = None
-        has_filter = False
-
-        # 1. 사용자 검색 필터 적용 (@닉네임, @아이디, from:@아이디)
-        if writer:
-            if writer.startswith("from:@"):
-                username = writer.replace(
-                    "from:@", ""
-                ).strip()  # `from:@아이디` → 아이디만 추출
-                try:
-                    user = User.objects.get(username=username)  # ✅ ID(username)만 검색
-                    user_query = Q(user=user)
-                    has_filter = True
-                except User.DoesNotExist:
-                    return Response(
-                        {"message": "해당 사용자가 존재하지 않습니다."},
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-            elif writer.startswith("@"):
-                username_or_nickname = writer.replace(
-                    "@", ""
-                ).strip()  # `@닉네임` → 닉네임 또는 아이디 추출
-                try:
-                    user = User.objects.get(
-                        Q(username=username_or_nickname)
-                        | Q(nickname=username_or_nickname)
-                    )
-                    user_query = Q(
-                        user=user
-                    )  # ✅ ID(username) 또는 닉네임(nickname) 검색
-                    has_filter = True
-                except User.DoesNotExist:
-                    return Response(
-                        {"message": "해당 사용자가 존재하지 않습니다."},
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-
-        # 2. 태그 필터 적용 (교집합, 다중검색 가능)
-        if totaltag:
-            totaltag = totaltag[0].split(",") if len(totaltag) == 1 else totaltag
-            for tag in totaltag:
-                note_query &= (
-                    Q(emotion__name=tag)
-                    | Q(tag_time__name=[tag])
-                    | Q(tag_season__name=[tag])
-                    | Q(tag_context__name=[tag])
-                )
-                plis_query &= (
-                    Q(tag_time__name=[tag])
-                    | Q(tag_season__name=[tag])
-                    | Q(tag_context__name=[tag])
-                )
-                has_filter = True
-
-        # 3. 키워드 검색 적용 (사용자 검색이 아닐 경우)
-        # 노트+플리: 메모,곡명,가수명/노트만: 가사,위치/플리만:플리제목목
-        if keyword:
-            note_query_filter = (
-                Q(memo__icontains=keyword)
-                | Q(lyrics__icontains=keyword)
-                | Q(song_title__icontains=keyword)
-                | Q(artist__icontains=keyword)
-                | Q(location_name__icontains=keyword)
-                | Q(location_address__icontains=keyword)
-            )
-            note_query &= note_query_filter
-
-            plis_query_filter = (
-                Q(plinotes__note_memo__icontains=keyword)
-                | Q(plinotes__notes__lyrics__icontains=keyword)
-                | Q(plinotes__notes__song_title__icontains=keyword)
-                | Q(plinotes__notes__artist__icontains=keyword)
-                | Q(title__icontains=keyword)
-            )
-            plis_query &= plis_query_filter
-            has_filter = True
-
-        # 4. 사용자 검색이 있는 경우, 사용자 필터 적용
-        if user_query:
-            if note_query == Q():
-                note_query = user_query  # 다른 필터 조건이 없으면 단독 적용
-            else:
-                note_query &= user_query
-
-            if plis_query == Q():
-                plis_query = user_query
-            else:
-                plis_query &= user_query
-            has_filter = True
-
-        # 검색 실행
-        notes_results = (
-            Notes.objects.filter(note_query).distinct()
-            if has_filter
-            else Notes.objects.all()
-        )
-        plis_results = (
-            Plis.objects.filter(plis_query).distinct()
-            if has_filter
-            else Plis.objects.all()
-        )
-
-        # 데이터 직렬화
-        data = {
-            "Memo": SearchAllMemoNotesSerializer(notes_results, many=True).data
-            + SearchAllPlisSerializer(plis_results, many=True).data,
-            "Lyrics": SearchAllNotesLSSSerializer(notes_results, many=True).data,
-            "SongTitle": SearchAllNotesLSSSerializer(notes_results, many=True).data
-            + SearchAllPlisSSPSerializer(plis_results, many=True).data,
-            "Singer": SearchAllNotesLSSSerializer(notes_results, many=True).data
-            + SearchAllPlisSSPSerializer(plis_results, many=True).data,
-            "Location": SearchAllNotesLocationSerializer(notes_results, many=True).data,
-            "PlisTitle": SearchAllPlisSSPSerializer(plis_results, many=True).data,
-        }
-
-        # ✅ 특정 필터가 있는 경우 해당 데이터만 반환
-        filtered_data = (
-            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
-        )
-
-        return Response(
-            {"message": "탐색결과 통합 조회 성공", "data": filtered_data},
-            status=status.HTTP_200_OK,
-        )
-"""
 
 
 # 통합검색(노트)
@@ -614,70 +481,7 @@ class SearchNotesView(views.APIView):
             else:
                 query &= user_query
             has_filter = True
-        """
-        # ✅ 검색 실행
-        search_results = (
-            Notes.objects.filter(query).distinct()
-            if has_filter
-            else Notes.objects.all()
-        )
 
-        # ✅ keyword가 있을 경우에만 필터 적용
-        data = {
-            "Memo": SearchNotesMemoSerializer(
-                (
-                    search_results.filter(memo__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "Lyrics": SearchNotesLTSSerializer(
-                (
-                    search_results.filter(lyrics__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "Title": SearchNotesLTSSerializer(
-                (
-                    search_results.filter(song_title__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "Singer": SearchNotesLTSSerializer(
-                (
-                    search_results.filter(artist__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "Location": SearchNotesLocationSerializer(
-                search_results.filter(
-                    (
-                        Q(location_name__icontains=keyword)
-                        | Q(location_address__icontains=keyword)
-                    )
-                    if keyword
-                    else Q()
-                ),
-                many=True,
-            ).data,
-        }
-
-        # ✅ 특정 필터가 있는 경우 해당 데이터만 반환
-        filtered_data = (
-            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
-        )
-
-        return Response(
-            {"message": "탐색결과 노트 조회 성공", "data": filtered_data},
-            status=status.HTTP_200_OK,
-        )
         """
         # --- visibility 필터 추가 ---
         vis_q = Q(visibility="public")
@@ -737,6 +541,83 @@ class SearchNotesView(views.APIView):
                     )
                     if keyword
                     else search_results
+                ),
+                many=True,
+            ).data,
+        }
+
+        filtered_data = (
+            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
+        )
+        return Response(
+            {"message": "탐색결과 노트 조회 성공", "data": filtered_data},
+            status=status.HTTP_200_OK,
+        )
+        """
+        # ---------- (2) visibility + 차단 필터 빌드 ----------
+        me = request.user
+        vis_q = Q(visibility="public")
+
+        if me.is_authenticated:
+            # friends, private 가시성 추가
+            following_ids = UserFollows.objects.filter(follower=me).values_list(
+                "following_id", flat=True
+            )
+
+            vis_q |= Q(visibility="friends", user__in=following_ids)
+            vis_q |= Q(user=me)  # 내가 쓴 글은 private 도 보이게
+
+        # (2-1) base Q = 검색조건 ∧ visibility
+        base_q = (query & vis_q) if has_filter else vis_q
+
+        # ---------- ★ (3) 차단 필터 적용 ----------
+        if me.is_authenticated:
+            blocked_note_ids = NoteBlock.objects.filter(user=me).values_list(
+                "note_id", flat=True
+            )
+            blocked_user_ids = UserBlock.objects.filter(user=me).values_list(
+                "blocked_user_id", flat=True
+            )
+
+            notes_qs = (
+                Notes.objects.filter(base_q)
+                .exclude(id__in=blocked_note_ids)
+                .exclude(user_id__in=blocked_user_ids)
+                .distinct()
+            )
+        else:
+            notes_qs = Notes.objects.filter(base_q).distinct()
+
+        # ---------- (4) 결과 직렬화 & 카테고리별 분류 (기존 코드) ----------
+        data = {
+            "Memo": SearchNotesMemoSerializer(
+                (notes_qs.filter(memo__icontains=keyword) if keyword else notes_qs),
+                many=True,
+            ).data,
+            "Lyrics": SearchNotesLTSSerializer(
+                (notes_qs.filter(lyrics__icontains=keyword) if keyword else notes_qs),
+                many=True,
+            ).data,
+            "Title": SearchNotesLTSSerializer(
+                (
+                    notes_qs.filter(song_title__icontains=keyword)
+                    if keyword
+                    else notes_qs
+                ),
+                many=True,
+            ).data,
+            "Singer": SearchNotesLTSSerializer(
+                (notes_qs.filter(artist__icontains=keyword) if keyword else notes_qs),
+                many=True,
+            ).data,
+            "Location": SearchNotesLocationSerializer(
+                (
+                    notes_qs.filter(
+                        Q(location_name__icontains=keyword)
+                        | Q(location_address__icontains=keyword)
+                    )
+                    if keyword
+                    else notes_qs
                 ),
                 many=True,
             ).data,
@@ -887,67 +768,6 @@ class SearchPlisView(views.APIView):
                 query &= user_query
             has_filter = True
         """
-        # ✅ 검색 실행
-        search_results = (
-            Plis.objects.filter(query).distinct() if has_filter else Plis.objects.all()
-        )
-
-        # ✅ keyword가 있을 경우에만 필터 적용
-        data = {
-            "Memo": SearchPlisMemoSerializer(
-                (
-                    search_results.filter(plinotes__note_memo__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "Lyrics": SearchPlisLSSPSerializer(
-                (
-                    search_results.filter(plinotes__notes__lyrics__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "SongTitle": SearchPlisLSSPSerializer(
-                (
-                    search_results.filter(
-                        plinotes__notes__song_title__icontains=keyword
-                    )
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "Singer": SearchPlisLSSPSerializer(
-                (
-                    search_results.filter(plinotes__notes__artist__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-            "PlisTitle": SearchPlisLSSPSerializer(
-                (
-                    search_results.filter(title__icontains=keyword)
-                    if keyword
-                    else search_results
-                ),
-                many=True,
-            ).data,
-        }
-
-        # ✅ 특정 필터가 있는 경우 해당 데이터만 반환
-        filtered_data = (
-            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
-        )
-
-        return Response(
-            {"message": "탐색결과 플리 조회 성공", "data": filtered_data},
-            status=status.HTTP_200_OK,
-        )
-        """
         # --- visibility 필터 추가 ---
         vis_q = Q(visibility="public")
         if request.user.is_authenticated:
@@ -1021,6 +841,84 @@ class SearchPlisView(views.APIView):
             {"message": "탐색결과 플리 조회 성공", "data": filtered_data},
             status=status.HTTP_200_OK,
         )
+        """
+        # ---------- (6) visibility 필터 ----------
+        me = request.user
+        vis_q = Q(visibility="public")
+        if me.is_authenticated:
+            following_ids = UserFollows.objects.filter(follower=me).values_list(
+                "following_id", flat=True
+            )
+            vis_q |= Q(visibility="friends", user__in=following_ids)
+            vis_q |= Q(user=me)  # 내가 쓴 글은 private 도 봄
+
+        base_q = (query & vis_q) if has_filter else vis_q
+
+        # ---------- ★ (7) 차단 필터 ----------
+        if me.is_authenticated:
+            blocked_plis = PliBlock.objects.filter(user=me).values_list(
+                "pli_id", flat=True
+            )
+            blocked_users = UserBlock.objects.filter(user=me).values_list(
+                "blocked_user_id", flat=True
+            )
+
+            plis_qs = (
+                Plis.objects.filter(base_q)
+                .exclude(id__in=blocked_plis)
+                .exclude(user_id__in=blocked_users)
+                .distinct()
+            )
+        else:
+            plis_qs = Plis.objects.filter(base_q).distinct()
+
+        # ---------- (8) 결과 직렬화 ----------
+        data = {
+            "Memo": SearchPlisMemoSerializer(
+                (
+                    plis_qs.filter(plinotes__note_memo__icontains=keyword)
+                    if keyword
+                    else plis_qs
+                ),
+                many=True,
+            ).data,
+            "Lyrics": SearchPlisLSSPSerializer(
+                (
+                    plis_qs.filter(plinotes__notes__lyrics__icontains=keyword)
+                    if keyword
+                    else plis_qs
+                ),
+                many=True,
+            ).data,
+            "SongTitle": SearchPlisLSSPSerializer(
+                (
+                    plis_qs.filter(plinotes__notes__song_title__icontains=keyword)
+                    if keyword
+                    else plis_qs
+                ),
+                many=True,
+            ).data,
+            "Singer": SearchPlisLSSPSerializer(
+                (
+                    plis_qs.filter(plinotes__notes__artist__icontains=keyword)
+                    if keyword
+                    else plis_qs
+                ),
+                many=True,
+            ).data,
+            "PlisTitle": SearchPlisLSSPSerializer(
+                (plis_qs.filter(title__icontains=keyword) if keyword else plis_qs),
+                many=True,
+            ).data,
+        }
+
+        filtered_data = (
+            data if filter_type == "all" else {filter_type: data.get(filter_type, [])}
+        )
+        return Response(
+            {"message": "탐색결과 플리 조회 성공", "data": filtered_data},
+            status=status.HTTP_200_OK,
+        )
 
 
 # 통합검색(작성자)
@@ -1090,7 +988,51 @@ class SearchWritersView(views.APIView):
                 status=status.HTTP_200_OK,
             )
 
-        # 검색 실행
+        # 아무 조건도 없으면 빈 결과
+        if query == Q():
+            return Response(
+                {"message": "탐색결과 작성자 조회 성공", "data": {"user": []}},
+                status=status.HTTP_200_OK,
+            )
+
+        # (4) 기본 QuerySet
+        qs = User.objects.filter(query).distinct()
+
+        # ---------- ★ (5) 차단된 작성자 제외 ----------
+        me = request.user
+        if me.is_authenticated:
+            blocked_user_ids = UserBlock.objects.filter(user=me).values_list(
+                "blocked_user_id", flat=True
+            )
+            if blocked_user_ids:
+                qs = qs.exclude(id__in=blocked_user_ids)
+
+        # ---------- (6) 팔로잉 / 팔로워 annotate ----------
+        if me.is_authenticated:
+            qs = qs.annotate(
+                is_following=Exists(
+                    UserFollows.objects.filter(follower=me, following=OuterRef("pk"))
+                ),
+                is_follower=Exists(
+                    UserFollows.objects.filter(follower=OuterRef("pk"), following=me)
+                ),
+            )
+        else:
+            qs = qs.annotate(
+                is_following=Value(False, output_field=BooleanField()),
+                is_follower=Value(False, output_field=BooleanField()),
+            )
+
+        # ---------- (7) 직렬화 & 응답 ----------
+        serializer = SearchWritersSerializer(
+            qs, many=True, context={"request": request}
+        )
+        return Response(
+            {"message": "탐색결과 작성자 조회 성공", "data": {"user": serializer.data}},
+            status=status.HTTP_200_OK,
+        )
+
+        """ # 검색 실행
         qs = User.objects.filter(query).distinct()
 
         # 4. 로그인 여부에 따라 annotate
@@ -1118,3 +1060,4 @@ class SearchWritersView(views.APIView):
             {"message": "탐색결과 작성자 조회 성공", "data": {"user": serializer.data}},
             status=status.HTTP_200_OK,
         )
+ """
