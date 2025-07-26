@@ -32,14 +32,11 @@ import os
 import time
 import jwt
 
-#BASE_URL = 'http://localhost:8000/'
-#BASE_URL = 'https://05b17e3d7f3c.ngrok-free.app/'
-BASE_URL = 'http://3.39.188.131/'
+BASE_URL = 'https://api.whatdoyousing.com/'
 
 KAKAO_CONFIG = {
     "KAKAO_REST_API_KEY":getattr(WDYS.settings.base, 'KAKAO_CLIENT_ID', None),
-    #"KAKAO_REDIRECT_URI": "http://localhost:8000/accounts/kakao/callback/",
-    "KAKAO_REDIRECT_URI": "http://3.39.188.131/accounts/kakao/callback/",
+    "KAKAO_REDIRECT_URI": "https://api.whatdoyousing.com/accounts/kakao/callback/",
     "KAKAO_CLIENT_SECRET_KEY": getattr(WDYS.settings.base, 'KAKAO_CLIENT_SECRET_KEY', None), 
 }
 kakao_login_uri = "https://kauth.kakao.com/oauth/authorize"
