@@ -497,15 +497,9 @@ class AppleCallbackView(views.APIView):
             'sub': settings.APPLE_CLIENT_ID,
         }
 
-        private_key_obj = serialization.load_pem_private_key(
-        settings.APPLE_PRIVATE_KEY.encode(),  # ensure bytes
-        password=None,
-        backend=default_backend()
-        )
-
         client_secret = jwt.encode(
             payload,
-            private_key_obj,
+            settings.APPLE_PRIVATE_KEY,
             algorithm='ES256',
             headers=headers
         )
