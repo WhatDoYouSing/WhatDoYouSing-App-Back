@@ -22,6 +22,9 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.template.loader import render_to_string
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
 import hashlib
 import base64
 import WDYS
@@ -493,9 +496,16 @@ class AppleCallbackView(views.APIView):
             'aud': "https://appleid.apple.com",
             'sub': settings.APPLE_CLIENT_ID,
         }
+
+        private_key_obj = serialization.load_pem_private_key(
+        settings.APPLE_PRIVATE_KEY.encode(),  # ensure bytes
+        password=None,
+        backend=default_backend()
+        )
+
         client_secret = jwt.encode(
             payload,
-            settings.APPLE_PRIVATE_KEY,
+            private_key_obj,
             algorithm='ES256',
             headers=headers
         )
