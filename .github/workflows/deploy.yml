@@ -22,7 +22,7 @@ jobs:
       run: |
         touch .env
         echo "${{ secrets.ENV_VARS }}" >> .env
-        echo "APPLE_PRIVATE_KEY=${{ secrets.APPLE_PRIVATE_KEY }}" >> .env
+        echo "APPLE_PRIVATE_KEY=$(echo ${{ secrets.APPLE_PRIVATE_KEY_B64 }} | base64 -d)" >> .env
 
     - name: create remote directory
       uses: appleboy/ssh-action@v0.1.4
