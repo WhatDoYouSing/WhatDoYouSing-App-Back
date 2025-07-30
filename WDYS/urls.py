@@ -14,22 +14,24 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    #path('',include('allauth.urls')),
-    path('accounts/', include('accounts.urls')),
-    path('collects/', include('collects.urls')),
-    path('home/', include('home.urls')),
-    path('mypage/', include('mypage.urls')),
-    path('notes/', include('notes.urls')),
-    path('notifs/', include('notifs.urls')),
-    path('playlists/', include('playlists.urls')),
-    path('records/', include('records.urls')),
-    path('search/', include('search.urls')),
-    path('settings/', include('settings.urls')),
-    path('social/', include('social.urls')),
-    path('uploads/', include('uploads.urls')),
+    path("admin/", admin.site.urls),
+    # path('',include('allauth.urls')),
+    path("accounts/", include("accounts.urls")),
+    path("collects/", include("collects.urls")),
+    path("home/", include("home.urls")),
+    path("mypage/", include("mypage.urls")),
+    path("notes/", include("notes.urls")),
+    path("notifs/", include("notifs.urls")),
+    path("playlists/", include("playlists.urls")),
+    path("records/", include("records.urls")),
+    path("search/", include("search.urls")),
+    path("settings/", include("settings.urls")),
+    path("social/", include("social.urls")),
+    path("uploads/", include("uploads.urls")),
+    path("moderation/", include("moderation.urls")),
 ]
