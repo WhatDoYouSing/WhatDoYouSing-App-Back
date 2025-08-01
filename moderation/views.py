@@ -165,6 +165,7 @@ from rest_framework.exceptions import ValidationError
 from moderation.serializers import BlockActionSerializer
 from moderation.models import UserBlock, NoteBlock, PliBlock
 from notes.models import Notes, Plis
+from social.models import UserFollows
 
 User = get_user_model()
 
@@ -209,6 +210,13 @@ class BlockingView(APIView):
             _, created = UserBlock.objects.get_or_create(
                 blocker=request.user, blocked_user_id=target_id
             )
+            # 차단과 동시에 팔로우 관계 해제
+            UserFollows.objects.filter(
+                follower=request.user, following_id=target_id
+            ).delete()
+            UserFollows.objects.filter(
+                follower_id=target_id, following=request.user
+            ).delete()
 
         # ────── ② Note 차단 ──────
         elif target_type == "note":

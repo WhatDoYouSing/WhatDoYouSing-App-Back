@@ -1,4 +1,6 @@
 from moderation.utils.blocking import blocked_item_ids, blocked_user_ids
+from notes.models import Notes, Plis
+from accounts.models import User
 
 
 class BlockFilterMixin:
@@ -17,8 +19,18 @@ class BlockFilterMixin:
         if not u.is_authenticated or self.block_model is None:
             return qs
 
-        qs = qs.exclude(id__in=blocked_item_ids(u, self.block_model))
+        """ qs = qs.exclude(id__in=blocked_item_ids(u, self.block_model))
         qs = qs.exclude(user_id__in=blocked_user_ids(u))
+        return qs """
+        # 게시글(Notes, Plis)은 user_id로 필터
+        if self.block_model in [Notes, Plis]:
+            qs = qs.exclude(id__in=blocked_item_ids(u, self.block_model))
+            qs = qs.exclude(user_id__in=blocked_user_ids(u))
+
+        # 사용자(User)는 id로 필터
+        elif self.block_model == User:
+            qs = qs.exclude(id__in=blocked_user_ids(u))
+
         return qs
 
     def get_queryset(self):
