@@ -12,8 +12,11 @@ from social.models import UserFollows
 from home.serializers import *
 from .serializers import *
 
+from moderation.mixins import BlockFilterMixin
+from moderation.models import UserBlock, NoteBlock, PliBlock
 
-class PlaylistDetailView(APIView):
+
+class PlaylistDetailView(BlockFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
@@ -21,6 +24,18 @@ class PlaylistDetailView(APIView):
         user = request.user
         pli = get_object_or_404(Plis, id=pk)
         pli_owner = pli.user
+
+        # 차단한 사용자나 차단한 플리인 경우 → 접근 차단
+        is_blocked_user = UserBlock.objects.filter(
+            blocker=user, blocked_user=pli_owner
+        ).exists()
+        is_blocked_pli = PliBlock.objects.filter(blocker=user, pli=pli).exists()
+
+        if is_blocked_user or is_blocked_pli:
+            return Response(
+                {"error": "차단한 플리입니다."}, status=status.HTTP_403_FORBIDDEN
+            )
+
         # 친구 여부 확인
         is_friend = (
             UserFollows.objects.filter(follower=user, following=pli_owner).exists()
@@ -76,11 +91,21 @@ class PlaylistDetailView(APIView):
             + list(pli.tag_season.values_list("name", flat=True))
             + list(pli.tag_context.values_list("name", flat=True))
         )
+        # 플리 작성자가 차단한 유저 목록
+        blocked_users = UserBlock.objects.filter(blocker=pli.user).values_list(
+            "blocked_user", flat=True
+        )
 
+        # 차단당한 유저의 댓글 제외
+        comments = (
+            PliComment.objects.filter(pli__in=pli_notes.values_list("plis", flat=True))
+            .exclude(user__id__in=blocked_users)
+            .order_by("-created_at")
+        )
         # 댓글 가져오기 (최신순)
-        comments = PliComment.objects.filter(
+        """ comments = PliComment.objects.filter(
             pli__in=pli_notes.values_list("plis", flat=True)
-        ).order_by("-created_at")
+        ).order_by("-created_at") """
         comment = comments.first()
 
         serialized_comments = []
@@ -224,24 +249,42 @@ class PliCommentView(APIView):
             )
 
 
-class PliCommentListView(APIView):
+class PliCommentListView(BlockFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pli_id):
         user = request.user
         pli = get_object_or_404(Plis, id=pli_id)
 
+        # 차단한 사용자 ID 목록
+        blocked_users = UserBlock.objects.filter(blocker=user).values_list(
+            "blocked_user", flat=True
+        )
+
         # 댓글 개수 & 스크랩 개수
         comment_count = PliComment.objects.filter(pli=pli).count()
         scrap_count = ScrapPlaylists.objects.filter(content_id=pli_id).count()
 
         # 부모 댓글 (최상위 댓글) 가져오기
-        comments = PliComment.objects.filter(pli=pli).order_by("created_at")
+        # comments = PliComment.objects.filter(pli=pli).order_by("created_at")
+
+        # 차단한 유저의 댓글 제외
+        comments = (
+            PliComment.objects.filter(pli=pli)
+            .exclude(user__id__in=blocked_users)
+            .order_by("created_at")
+        )
 
         # 댓글 직렬화
         serialized_comments = []
         for comment in comments:
-            replies = PliReply.objects.filter(comment=comment).order_by("created_at")
+            # replies = PliReply.objects.filter(comment=comment).order_by("created_at")
+            # 대댓글도 차단한 유저의 것 제외
+            replies = (
+                PliReply.objects.filter(comment=comment)
+                .exclude(user__id__in=blocked_users)
+                .order_by("created_at")
+            )
 
             serialized_replies = [
                 {

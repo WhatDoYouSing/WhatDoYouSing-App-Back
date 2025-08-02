@@ -43,11 +43,12 @@ class NoteDetailView(BlockFilterMixin, APIView):
             )
 
         # 댓글 가져오기
-        comments = NoteComment.objects.filter(note=note).order_by("-created_at")
+        # comments = NoteComment.objects.filter(note=note).order_by("-created_at")
         # 차단한 유저의 댓글 제외
-        blocked_users = UserBlock.objects.filter(blocker=user).values_list(
+        blocked_users = UserBlock.objects.filter(blocker=note.user).values_list(
             "blocked_user", flat=True
         )
+
         comments = (
             NoteComment.objects.filter(note=note)
             .exclude(user__id__in=blocked_users)
