@@ -13,7 +13,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import environ
-import os
+import os, base64
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -53,15 +56,12 @@ APPLE_TEAM_ID = env("APPLE_TEAM_ID")
 APPLE_CLIENT_ID = env("APPLE_CLIENT_ID")
 APPLE_REDIRECT_URI = env("APPLE_REDIRECT_URI")
 APPLE_KEY_ID = env("APPLE_KEY_ID")
-# APPLE_KEY_PATH = os.getenv("APPLE_KEY_PATH")
-APPLE_PRIVATE_KEY = os.environ.get("APPLE_PRIVATE_KEY")
-
-"""
-if APPLE_KEY_PATH:
-    key_full_path = os.path.join(BASE_DIR, APPLE_KEY_PATH)
-    with open(key_full_path, 'r') as f:
-        APPLE_PRIVATE_KEY = f.read()
-"""
+# APPLE_PRIVATE_KEY=os.environ.get("APPLE_PRIVATE_KEY")
+APPLE_PRIVATE_KEY = serialization.load_pem_private_key(
+    base64.b64decode(os.environ.get("APPLE_PRIVATE_KEY_B64")),
+    password=None,
+    backend=default_backend(),
+)
 
 ALLOWED_HOSTS = ["*"]
 
