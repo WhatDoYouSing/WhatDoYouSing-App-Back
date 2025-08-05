@@ -8,9 +8,6 @@ from .models import (
     NoteEmotion,
     Emotions,
     Plis,
-    NoteBlock,
-    PliBlock,
-    UserBlock,
 )
 from collects.models import ScrapNotes
 from rest_framework.permissions import IsAuthenticated
@@ -21,17 +18,42 @@ from home.serializers import *
 from django.db.models import F
 from .serializers import *
 from django.db.models import Count
+from moderation.mixins import BlockFilterMixin
+from moderation.models import UserBlock, NoteBlock, PliBlock
 
 
-class NoteDetailView(APIView):
+class NoteDetailView(BlockFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, note_id):
+        user = request.user
+
         # 노트 가져오기
         note = get_object_or_404(Notes, id=note_id)
 
+        # ✅ 차단한 유저 or 차단한 노트라면 접근 차단
+        blocked_user_exists = UserBlock.objects.filter(
+            blocker=user, blocked_user=note.user
+        ).exists()
+        blocked_note_exists = NoteBlock.objects.filter(blocker=user, note=note).exists()
+
+        if blocked_user_exists or blocked_note_exists:
+            return Response(
+                {"message": "차단한 유저/노트입니다."}, status=status.HTTP_403_FORBIDDEN
+            )
+
         # 댓글 가져오기
-        comments = NoteComment.objects.filter(note=note).order_by("-created_at")
+        # comments = NoteComment.objects.filter(note=note).order_by("-created_at")
+        # 차단한 유저의 댓글 제외
+        blocked_users = UserBlock.objects.filter(blocker=note.user).values_list(
+            "blocked_user", flat=True
+        )
+
+        comments = (
+            NoteComment.objects.filter(note=note)
+            .exclude(user__id__in=blocked_users)
+            .order_by("-created_at")
+        )
 
         # 감정 개수 가져오기
         emotion_counts = (
@@ -138,7 +160,8 @@ class NoteDetailView(APIView):
             "created_at": note.created_at.strftime("%Y-%m-%d %H:%M"),
             "is_updated": note.is_updated,
             "visibility": note.visibility,
-            "emotion": note.emotion.name,
+            # "emotion": note.emotion.name,
+            "emotion": note.emotion.name if note.emotion else None,
             "song_title": note.song_title,
             "artist": note.artist,
             "album_art": note.album_art,
@@ -400,24 +423,41 @@ class NoteCommentView(APIView):
             )
 
 
-class NoteCommentListView(APIView):
+class NoteCommentListView(BlockFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, note_id):
         user = request.user
         note = get_object_or_404(Notes, id=note_id)
 
+        # 내가 차단한 사용자 목록 가져오기
+        blocked_users = UserBlock.objects.filter(blocker=user).values_list(
+            "blocked_user", flat=True
+        )
+
         # 댓글 개수 & 스크랩 개수
         comment_count = NoteComment.objects.filter(note=note).count()
         scrap_count = ScrapNotes.objects.filter(content_id=note_id).count()
 
         # 부모 댓글 (최상위 댓글) 가져오기
-        comments = NoteComment.objects.filter(note=note).order_by("created_at")
+        # comments = NoteComment.objects.filter(note=note).order_by("created_at")
+        # 차단한 유저의 댓글 제외
+        comments = (
+            NoteComment.objects.filter(note=note)
+            .exclude(user__id__in=blocked_users)
+            .order_by("created_at")
+        )
 
         # 댓글 직렬화
         serialized_comments = []
         for comment in comments:
-            replies = NoteReply.objects.filter(comment=comment).order_by("created_at")
+            # replies = NoteReply.objects.filter(comment=comment).order_by("created_at")
+            # 차단한 유저의 대댓글 제외
+            replies = (
+                NoteReply.objects.filter(comment=comment)
+                .exclude(user__id__in=blocked_users)
+                .order_by("created_at")
+            )
 
             serialized_replies = [
                 {
@@ -603,82 +643,4 @@ class ReportCommentView(APIView):
         return Response(
             {"message": f"{report_type}이(가) 신고되었습니다."},
             status=status.HTTP_201_CREATED,
-        )
-
-
-# ───────────────────────── 게시글 차단/차단 해제 ──────────────────────────
-class BlockNoteView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        # 노트 차단
-        NoteBlock.objects.get_or_create(user=request.user, note_id=pk)
-        return Response({"message": "노트 차단 완료"}, status=status.HTTP_201_CREATED)
-
-    def delete(self, request, pk):
-        # 노트 차단 해제
-        NoteBlock.objects.filter(user=request.user, note_id=pk).delete()
-        return Response(
-            {"message": "노트 차단 해제"}, status=status.HTTP_204_NO_CONTENT
-        )
-
-
-class BlockPliView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        PliBlock.objects.get_or_create(user=request.user, pli_id=pk)
-        return Response({"message": "플리 차단 완료"}, status=status.HTTP_201_CREATED)
-
-    def delete(self, request, pk):
-        PliBlock.objects.filter(user=request.user, pli_id=pk).delete()
-        return Response(
-            {"message": "플리 차단 해제"}, status=status.HTTP_204_NO_CONTENT
-        )
-
-
-# ───────────────────────── 게시글 작성자 차단/차단 해제 ────────────────────
-class BlockNoteAuthorView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        note = get_object_or_404(Notes, id=pk)
-        if note.user == request.user:
-            return Response(
-                {"message": "자기 자신은 차단할 수 없습니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        UserBlock.objects.get_or_create(user=request.user, blocked_user=note.user)
-        return Response(
-            {"message": "노트 작성자 차단 완료"}, status=status.HTTP_201_CREATED
-        )
-
-    def delete(self, request, pk):
-        note = get_object_or_404(Notes, id=pk)
-        UserBlock.objects.filter(user=request.user, blocked_user=note.user).delete()
-        return Response(
-            {"message": "노트 작성자 차단 해제"}, status=status.HTTP_204_NO_CONTENT
-        )
-
-
-class BlockPliAuthorView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        pli = get_object_or_404(Plis, id=pk)
-        if pli.user == request.user:
-            return Response(
-                {"message": "자기 자신은 차단할 수 없습니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        UserBlock.objects.get_or_create(user=request.user, blocked_user=pli.user)
-        return Response(
-            {"message": "플리 작성자 차단 완료"}, status=status.HTTP_201_CREATED
-        )
-
-    def delete(self, request, pk):
-        pli = get_object_or_404(Plis, id=pk)
-        UserBlock.objects.filter(user=request.user, blocked_user=pli.user).delete()
-        return Response(
-            {"message": "플리 작성자 차단 해제"}, status=status.HTTP_204_NO_CONTENT
         )

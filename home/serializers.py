@@ -8,7 +8,7 @@ from playlists.models import *
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'nickname', 'profile']
+        fields = ["id", "username", "nickname", "profile"]
 
 
 # 노트 직렬화
@@ -16,16 +16,31 @@ class NoteSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     user = UserSerializer()
     emotion = serializers.SerializerMethodField()
+
     class Meta:
         model = Notes
         fields = [
-            'type', 'id', 'user', 'created_at', 'is_updated', 'visibility', 
-            'emotion', 'song_title', 'artist', 'lyrics', 'album_art', 'memo', 'link'
+            "type",
+            "id",
+            "user",
+            "created_at",
+            "is_updated",
+            "visibility",
+            "emotion",
+            "song_title",
+            "artist",
+            "lyrics",
+            "album_art",
+            "memo",
+            "link",
         ]
-    def get_type(self,obj):
+
+    def get_type(self, obj):
         return "note"
-    def get_emotion(self,obj):
-        return obj.emotion.name
+
+    def get_emotion(self, obj):
+        return obj.emotion.name if obj.emotion else None
+
 
 # 플리 직렬화
 class PliSerializer(serializers.ModelSerializer):
@@ -35,47 +50,67 @@ class PliSerializer(serializers.ModelSerializer):
     album_art = serializers.SerializerMethodField()
     memo = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
+
     class Meta:
         model = Plis
         fields = [
-            'type', 'id', 'user', 'created_at', 'is_updated', 'visibility', 
-            'info', 'title', 'album_art', 'memo', 'link'
+            "type",
+            "id",
+            "user",
+            "created_at",
+            "is_updated",
+            "visibility",
+            "info",
+            "title",
+            "album_art",
+            "memo",
+            "link",
         ]
-    def get_type(self,obj):
+
+    def get_type(self, obj):
         return "pli"
-    def get_info(self,obj):
-        return "노트 "+str(PliNotes.objects.filter(plis=obj).count()) # 수정 필요 (임시)
-    def get_lyric(self,obj):
+
+    def get_info(self, obj):
+        return "노트 " + str(
+            PliNotes.objects.filter(plis=obj).count()
+        )  # 수정 필요 (임시)
+
+    def get_lyric(self, obj):
         return obj.title
-    def get_emotion(self,obj):
+
+    def get_emotion(self, obj):
         return None
-    def get_memo(self,obj):
+
+    def get_memo(self, obj):
         first_note = PliNotes.objects.filter(plis=obj).first()
         if first_note:
-            return first_note.note_memo  
-        return None 
-    def get_link(self,obj):
+            return first_note.note_memo
+        return None
+
+    def get_link(self, obj):
         first_note = PliNotes.objects.filter(plis=obj).first()
         if first_note:
-            return first_note.notes.link  
-        return None 
-    def get_album_art(self,obj):
-        first_four_album_arts = PliNotes.objects.filter(plis=obj).values_list('notes__album_art', flat=True)[:4]
-    
+            return first_note.notes.link
+        return None
+
+    def get_album_art(self, obj):
+        first_four_album_arts = PliNotes.objects.filter(plis=obj).values_list(
+            "notes__album_art", flat=True
+        )[:4]
+
         # 앨범 아트 리스트가 비어 있지 않으면 반환, 없으면 None
         if first_four_album_arts:
             return list(first_four_album_arts)
-        
+
         return None
 
-        
 
 class HomeContentSerializer(serializers.Serializer):
     content = serializers.SerializerMethodField()
 
     def get_content(self, obj):
-        if obj.type == 'note':
+        if obj.type == "note":
             return NoteSerializer(obj.content).data  # obj.content는 Note 객체여야 함
-        elif obj.type == 'pli':
+        elif obj.type == "pli":
             return PliSerializer(obj.content).data  # obj.content는 Pli 객체여야 함
         return {}
