@@ -22,6 +22,9 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.template.loader import render_to_string
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
 import hashlib
 import base64
 import WDYS
@@ -32,14 +35,11 @@ import os
 import time
 import jwt
 
-#BASE_URL = 'http://localhost:8000/'
-#BASE_URL = 'https://05b17e3d7f3c.ngrok-free.app/'
-BASE_URL = 'http://3.39.188.131/'
+BASE_URL = 'https://api.whatdoyousing.com/'
 
 KAKAO_CONFIG = {
     "KAKAO_REST_API_KEY":getattr(WDYS.settings.base, 'KAKAO_CLIENT_ID', None),
-    #"KAKAO_REDIRECT_URI": "http://localhost:8000/accounts/kakao/callback/",
-    "KAKAO_REDIRECT_URI": "http://3.39.188.131/accounts/kakao/callback/",
+    "KAKAO_REDIRECT_URI": "https://api.whatdoyousing.com/accounts/kakao/callback/",
     "KAKAO_CLIENT_SECRET_KEY": getattr(WDYS.settings.base, 'KAKAO_CLIENT_SECRET_KEY', None), 
 }
 kakao_login_uri = "https://kauth.kakao.com/oauth/authorize"
@@ -496,6 +496,7 @@ class AppleCallbackView(views.APIView):
             'aud': "https://appleid.apple.com",
             'sub': settings.APPLE_CLIENT_ID,
         }
+
         client_secret = jwt.encode(
             payload,
             settings.APPLE_PRIVATE_KEY,
