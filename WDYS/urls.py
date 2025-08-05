@@ -35,5 +35,4 @@ urlpatterns = [
     path("settings/", include("settings.urls")),
     path("social/", include("social.urls")),
     path("uploads/", include("uploads.urls")),
-    path("moderation/", include("moderation.urls")),
 ]
