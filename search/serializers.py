@@ -2,26 +2,32 @@ from rest_framework import serializers
 from notes.models import *
 from accounts.models import *
 from social.models import UserFollows
-from accounts.serializers import UserSerializer
+
+# from accounts.serializers import UserSerializer
 
 # 전부 다 tag 필드 삭제하기!
+
+
+# account serializer에서 못가져오길래 걍 만듦.
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "nickname", "profile"]
 
 
 # 탐색결과(전체)
 # Writer 정보
 class SearchAllWriterSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
 
     class Meta:
-        model = Notes
-        fields = [
-            "user",
-        ]
+        model = User
+        fields = ["id", "nickname", "profile"]
 
 
 # Note 타입 - 메모
 class SearchAllMemoNotesSerializer(serializers.ModelSerializer):
     type = serializers.CharField(default="note")
+    user = UserSerializer(read_only=True)
 
     class Meta:
         model = Notes

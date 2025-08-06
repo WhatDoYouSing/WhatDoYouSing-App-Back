@@ -286,8 +286,55 @@ class SearchView(BlockFilterMixin, views.APIView):
         user_query = None
         has_filter = False
 
-        # 1. 사용자 검색 필터 적용 (@닉네임, @아이디, from:@아이디)
-        if writer:
+        # ── 작성자 검색 조건 처리 ──
+        is_writer_search = bool(
+            writer and (writer.startswith("@") or writer.startswith("from:@"))
+        )
+
+        writer_qs = User.objects.none()
+
+        if is_writer_search:
+            # from:@아이디 → username 정확히 매칭
+            if writer.startswith("from:@"):
+                username = writer.replace("from:@", "").strip()
+                writer_qs = User.objects.filter(username=username)
+                if not writer_qs.exists():
+                    return Response(
+                        {"message": "해당 사용자가 존재하지 않습니다."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            # `@닉네임` → 닉네임 또는 아이디 추출
+            elif writer.startswith("@"):
+                uname = writer.replace("@", "").strip()
+                writer_qs = User.objects.filter(Q(username=uname) | Q(nickname=uname))
+                if not writer_qs.exists():
+                    return Response(
+                        {"message": "해당 사용자가 존재하지 않습니다."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            # — 여기서 차단된 유저 제외 —
+            if request.user.is_authenticated:
+                writer_qs = writer_qs.exclude(id__in=blocked_user_ids(request.user))
+
+            # — 존재하지 않는 사용자일 때 404
+            if not writer_qs.exists():
+                return Response(
+                    {"message": "해당 사용자가 존재하지 않습니다."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            # — 노트/플리 필터용 Q 객체 생성
+            user_query = Q(user__in=writer_qs)
+            note_query &= user_query
+            plis_query &= user_query
+            has_filter = True
+        # (2) keyword-only 작성자 탭: nickname 포함 검색
+        elif keyword:
+            writer_qs = User.objects.filter(nickname__icontains=keyword)
+            if request.user.is_authenticated:
+                writer_qs = writer_qs.exclude(id__in=blocked_user_ids(request.user))
+            # 빈 리스트여도 에러 없이 넘어감
+
+        """ if writer:
             if writer.startswith("from:@"):
                 username = writer.replace(
                     "from:@", ""
@@ -318,7 +365,7 @@ class SearchView(BlockFilterMixin, views.APIView):
                     return Response(
                         {"message": "해당 사용자가 존재하지 않습니다."},
                         status=status.HTTP_404_NOT_FOUND,
-                    )
+                    ) """
 
         # 2. 키워드 검색 적용 (사용자 검색이 아닐 경우)
         # 노트+플리: 메모,곡명,가수명/노트만: 가사,위치/플리만:플리제목목
@@ -487,6 +534,9 @@ class SearchView(BlockFilterMixin, views.APIView):
             status=status.HTTP_200_OK,
         ) """
         data = {
+            "Writer": SearchAllWriterSerializer(
+                writer_qs, many=True, context={"request": request}
+            ).data,
             # ① Memo  ─ notes.memo / plinotes.note_memo
             "Memo": SearchAllMemoNotesSerializer(
                 (notes_qs.filter(memo__icontains=keyword) if keyword else notes_qs),
@@ -502,11 +552,7 @@ class SearchView(BlockFilterMixin, views.APIView):
             ).data,
             # ② Lyrics ─ notes.lyrics / plinotes.notes.lyrics
             "Lyrics": SearchAllNotesLSSSerializer(
-                (
-                    notes_qs.filter(lyrics__icontains=keyword)
-                    if keyword
-                    else notes_qs.none()
-                ),
+                (notes_qs.filter(lyrics__icontains=keyword) if keyword else notes_qs),
                 many=True,
             ).data,
             # ③ SongTitle ─ notes.song_title / plinotes.notes.song_title
@@ -514,7 +560,7 @@ class SearchView(BlockFilterMixin, views.APIView):
                 (
                     notes_qs.filter(song_title__icontains=keyword)
                     if keyword
-                    else notes_qs.none()
+                    else notes_qs
                 ),
                 many=True,
             ).data
@@ -522,24 +568,20 @@ class SearchView(BlockFilterMixin, views.APIView):
                 (
                     plis_qs.filter(plinotes__notes__song_title__icontains=keyword)
                     if keyword
-                    else plis_qs.none()
+                    else plis_qs
                 ),
                 many=True,
             ).data,
             # ④ Singer ─ notes.artist / plinotes.notes.artist
             "Singer": SearchAllNotesLSSSerializer(
-                (
-                    notes_qs.filter(artist__icontains=keyword)
-                    if keyword
-                    else notes_qs.none()
-                ),
+                (notes_qs.filter(artist__icontains=keyword) if keyword else notes_qs),
                 many=True,
             ).data
             + SearchAllPlisSSPSerializer(
                 (
                     plis_qs.filter(plinotes__notes__artist__icontains=keyword)
                     if keyword
-                    else plis_qs.none()
+                    else plis_qs
                 ),
                 many=True,
             ).data,
@@ -551,17 +593,13 @@ class SearchView(BlockFilterMixin, views.APIView):
                         | Q(location_address__icontains=keyword)
                     )
                     if keyword
-                    else notes_qs.none()
+                    else notes_qs
                 ),
                 many=True,
             ).data,
             # ⑥ PlisTitle ─ 플리 자체 제목 (노트엔 해당 없음)
             "PlisTitle": SearchAllPlisSSPSerializer(
-                (
-                    plis_qs.filter(title__icontains=keyword)
-                    if keyword
-                    else plis_qs.none()
-                ),
+                (plis_qs.filter(title__icontains=keyword) if keyword else plis_qs),
                 many=True,
             ).data,
         }
