@@ -45,9 +45,9 @@ class SearchAllMemoNotesSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
 
@@ -72,9 +72,9 @@ class SearchAllPlisSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
     def get_note_count(self, obj):  # 인용된 노트 개수 카운트
@@ -113,9 +113,9 @@ class SearchAllNotesLSSSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
 
@@ -139,9 +139,9 @@ class SearchAllPlisSSPSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
     def get_note_count(self, obj):
@@ -177,9 +177,9 @@ class SearchAllNotesLocationSerializer(serializers.ModelSerializer):
             "is_updated",
             "location_name",
             "location_address",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
 
@@ -204,9 +204,9 @@ class SearchNotesMemoSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
 
@@ -228,9 +228,9 @@ class SearchNotesLTSSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
 
@@ -254,9 +254,9 @@ class SearchNotesLocationSerializer(serializers.ModelSerializer):
             "is_updated",
             "location_name",
             "location_address",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
 
@@ -292,9 +292,9 @@ class SearchPlisMemoSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
     def get_note_count(self, obj):  # 인용된 노트 개수 카운트
@@ -331,9 +331,9 @@ class SearchPlisLSSPSerializer(serializers.ModelSerializer):
             "visibility",
             "created_at",
             "is_updated",
-            "tag_time",
-            "tag_season",
-            "tag_context",
+            # "tag_time",
+            # "tag_season",
+            # "tag_context",
         ]
 
     def get_note_count(self, obj):
