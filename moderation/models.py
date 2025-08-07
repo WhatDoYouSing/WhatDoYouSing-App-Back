@@ -1,58 +1,6 @@
-# from django.db import models
-# from django.conf import settings
-# from accounts.models import User
-# from notes.models import *
-
-# # Create your models here.
-
-
-# # 차단 관련 코드(박나담)
-# class NoteBlock(models.Model):
-#     """사용자가 특정 노트를 차단"""
-
-#     user = models.ForeignKey(
-#         User, on_delete=models.CASCADE, related_name="blocked_notes"
-#     )
-#     note = models.ForeignKey("Notes", on_delete=models.CASCADE, related_name="blocks")
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     class Meta:
-#         db_table = "note_blocks"
-#         unique_together = ("user", "note")
-
-
-# class PliBlock(models.Model):
-#     """사용자가 특정 플리를 차단"""
-
-#     user = models.ForeignKey(
-#         User, on_delete=models.CASCADE, related_name="blocked_plis"
-#     )
-#     pli = models.ForeignKey("Plis", on_delete=models.CASCADE, related_name="blocks")
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     class Meta:
-#         db_table = "pli_blocks"
-#         unique_together = ("user", "pli")
-
-
-# class UserBlock(models.Model):
-#     """사용자가 게시글 작성자를 차단"""
-
-#     user = models.ForeignKey(
-#         User, on_delete=models.CASCADE, related_name="blocked_users"
-#     )
-#     blocked_user = models.ForeignKey(
-#         User, on_delete=models.CASCADE, related_name="blocked_by"
-#     )
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     class Meta:
-#         db_table = "user_blocks"
-#         unique_together = ("user", "blocked_user")
-
 from django.db import models
 from django.conf import settings
-from notes.models import Notes, Plis
+from notes.models import Notes, Plis, NoteComment, PliComment, NoteReply, PliReply
 
 
 class UserBlock(models.Model):
@@ -96,3 +44,81 @@ class PliBlock(models.Model):
 
     def __str__(self):
         return f"{self.blocker} ⟶ pli:{self.pli_id}"
+
+
+class NoteCommentBlock(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocked_note_comments",
+    )
+    comment = models.ForeignKey(
+        NoteComment, on_delete=models.CASCADE, related_name="blocks"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "note_comment_blocks"
+        unique_together = ("blocker", "comment")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.blocker} ⟶ NoteComment:{self.comment_id}"
+
+
+class PliCommentBlock(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocked_pli_comments",
+    )
+    comment = models.ForeignKey(
+        PliComment, on_delete=models.CASCADE, related_name="blocks"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pli_comment_blocks"
+        unique_together = ("blocker", "comment")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.blocker} ⟶ PliComment:{self.comment_id}"
+
+
+class NoteReplyBlock(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocked_note_replies",
+    )
+    reply = models.ForeignKey(
+        NoteReply, on_delete=models.CASCADE, related_name="blocks"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "note_reply_blocks"
+        unique_together = ("blocker", "reply")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.blocker} ⟶ NoteReply:{self.reply_id}"
+
+
+class PliReplyBlock(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocked_pli_replies",
+    )
+    reply = models.ForeignKey(PliReply, on_delete=models.CASCADE, related_name="blocks")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pli_reply_blocks"
+        unique_together = ("blocker", "reply")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.blocker} ⟶ PliReply:{self.reply_id}"

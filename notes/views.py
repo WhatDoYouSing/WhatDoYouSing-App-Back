@@ -19,7 +19,7 @@ from django.db.models import F
 from .serializers import *
 from django.db.models import Count
 from moderation.mixins import BlockFilterMixin
-from moderation.models import UserBlock, NoteBlock, PliBlock
+from moderation.models import *
 
 
 class NoteDetailView(BlockFilterMixin, APIView):
@@ -45,13 +45,19 @@ class NoteDetailView(BlockFilterMixin, APIView):
         # 댓글 가져오기
         # comments = NoteComment.objects.filter(note=note).order_by("-created_at")
         # 차단한 유저의 댓글 제외
-        blocked_users = UserBlock.objects.filter(blocker=note.user).values_list(
+        blocked_users = UserBlock.objects.filter(blocker=user).values_list(
             "blocked_user", flat=True
+        )
+        blocked_comment_ids = NoteCommentBlock.objects.filter(blocker=user).values_list(
+            "comment_id", flat=True
+        )
+        blocked_reply_ids = NoteReplyBlock.objects.filter(blocker=user).values_list(
+            "reply_id", flat=True
         )
 
         comments = (
             NoteComment.objects.filter(note=note)
-            .exclude(user__id__in=blocked_users)
+            .exclude(Q(user__in=blocked_users) | Q(id__in=blocked_comment_ids))
             .order_by("-created_at")
         )
 
@@ -434,6 +440,13 @@ class NoteCommentListView(BlockFilterMixin, APIView):
         blocked_users = UserBlock.objects.filter(blocker=user).values_list(
             "blocked_user", flat=True
         )
+        # 내가 차단한 댓글/대댓글
+        blocked_comment_ids = NoteCommentBlock.objects.filter(blocker=user).values_list(
+            "comment_id", flat=True
+        )
+        blocked_reply_ids = NoteReplyBlock.objects.filter(blocker=user).values_list(
+            "reply_id", flat=True
+        )
 
         # 댓글 개수 & 스크랩 개수
         comment_count = NoteComment.objects.filter(note=note).count()
@@ -444,7 +457,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
         # 차단한 유저의 댓글 제외
         comments = (
             NoteComment.objects.filter(note=note)
-            .exclude(user__id__in=blocked_users)
+            .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_comment_ids))
             .order_by("created_at")
         )
 
@@ -455,7 +468,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
             # 차단한 유저의 대댓글 제외
             replies = (
                 NoteReply.objects.filter(comment=comment)
-                .exclude(user__id__in=blocked_users)
+                .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_reply_ids))
                 .order_by("created_at")
             )
 

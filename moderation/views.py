@@ -6,8 +6,16 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
 from moderation.serializers import BlockActionSerializer
-from moderation.models import UserBlock, NoteBlock, PliBlock
-from notes.models import Notes, Plis
+from moderation.models import (
+    UserBlock,
+    NoteBlock,
+    PliBlock,
+    NoteCommentBlock,
+    NoteReplyBlock,
+    PliCommentBlock,
+    PliReplyBlock,
+)
+from notes.models import Notes, Plis, NoteComment, NoteReply, PliComment, PliReply
 from social.models import UserFollows
 from collects.models import ScrapNotes, ScrapPlaylists, ScrapList
 
@@ -34,6 +42,26 @@ class BlockingView(APIView):
                 ),
                 "blocked_plis": list(
                     PliBlock.objects.filter(blocker=u).values_list("pli_id", flat=True)
+                ),
+                "blocked_notecomment": list(
+                    NoteCommentBlock.objects.filter(blocker=u).values_list(
+                        "comment_id", flat=True
+                    )
+                ),
+                "blocked_plicomment": list(
+                    PliCommentBlock.objects.filter(blocker=u).values_list(
+                        "comment_id", flat=True
+                    )
+                ),
+                "blocked_notereply": list(
+                    NoteReplyBlock.objects.filter(blocker=u).values_list(
+                        "reply_id", flat=True
+                    )
+                ),
+                "blocked_plireply": list(
+                    PliReplyBlock.objects.filter(blocker=u).values_list(
+                        "reply_id", flat=True
+                    )
                 ),
             },
             status=status.HTTP_200_OK,
@@ -99,7 +127,7 @@ class BlockingView(APIView):
                 ).delete()
 
         # ────── ③ Pli 차단 ──────
-        else:
+        elif target_type == "pli":
             pli = Plis.objects.filter(pk=target_id).first()
             if not pli:
                 raise ValidationError({"detail": "해당 플리가 존재하지 않습니다."})
@@ -116,6 +144,61 @@ class BlockingView(APIView):
                 ScrapPlaylists.objects.filter(
                     scrap_list__in=my_scrap_lists, content_id=pli.id
                 ).delete()
+
+        # ────── ④ Note 댓글 차단 ──────
+        elif target_type == "note_comment":
+            comment = NoteComment.objects.filter(pk=target_id).first()
+            if not comment:
+                raise ValidationError({"detail": "해당 댓글이 존재하지 않습니다."})
+            if comment.user_id == u.pk:
+                raise ValidationError(
+                    {"detail": "자신이 쓴 댓글은 차단할 수 없습니다."}
+                )
+
+            _, created = NoteCommentBlock.objects.get_or_create(
+                blocker=u, comment=comment
+            )
+
+        # ────── ⑤ Note 대댓글 차단 ──────
+        elif target_type == "note_reply":
+            reply = NoteReply.objects.filter(pk=target_id).first()
+            if not reply:
+                raise ValidationError({"detail": "해당 대댓글이 존재하지 않습니다."})
+            if reply.user_id == u.pk:
+                raise ValidationError(
+                    {"detail": "자신이 쓴 대댓글은 차단할 수 없습니다."}
+                )
+
+            _, created = NoteReplyBlock.objects.get_or_create(blocker=u, reply=reply)
+
+        # ────── ⑥ Pli 댓글 차단 ──────
+        elif target_type == "pli_comment":
+            comment = PliComment.objects.filter(pk=target_id).first()
+            if not comment:
+                raise ValidationError({"detail": "해당 댓글이 존재하지 않습니다."})
+            if comment.user_id == u.pk:
+                raise ValidationError(
+                    {"detail": "자신이 쓴 댓글은 차단할 수 없습니다."}
+                )
+
+            _, created = PliCommentBlock.objects.get_or_create(
+                blocker=u, comment=comment
+            )
+
+        # ────── ⑦ Pli 대댓글 차단 ──────
+        elif target_type == "pli_reply":
+            reply = PliReply.objects.filter(pk=target_id).first()
+            if not reply:
+                raise ValidationError({"detail": "해당 대댓글이 존재하지 않습니다."})
+            if reply.user_id == u.pk:
+                raise ValidationError(
+                    {"detail": "자신이 쓴 대댓글은 차단할 수 없습니다."}
+                )
+
+            _, created = PliReplyBlock.objects.get_or_create(blocker=u, reply=reply)
+
+        if "created" not in locals():
+            raise ValidationError({"detail": "알 수 없는 차단 대상입니다."})
 
         return Response(
             {
