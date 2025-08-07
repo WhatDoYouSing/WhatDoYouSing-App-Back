@@ -13,7 +13,7 @@ from home.serializers import *
 from .serializers import *
 
 from moderation.mixins import BlockFilterMixin
-from moderation.models import UserBlock, NoteBlock, PliBlock
+from moderation.models import *
 
 
 class PlaylistDetailView(BlockFilterMixin, APIView):
@@ -92,14 +92,20 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
             + list(pli.tag_context.values_list("name", flat=True))
         )
         # 플리 작성자가 차단한 유저 목록
-        blocked_users = UserBlock.objects.filter(blocker=pli.user).values_list(
+        blocked_users = UserBlock.objects.filter(blocker=request.user).values_list(
             "blocked_user", flat=True
+        )
+        blocked_comment_ids = PliCommentBlock.objects.filter(blocker=user).values_list(
+            "comment_id", flat=True
+        )
+        blocked_reply_ids = PliReplyBlock.objects.filter(blocker=user).values_list(
+            "reply_id", flat=True
         )
 
         # 차단당한 유저의 댓글 제외
         comments = (
             PliComment.objects.filter(pli__in=pli_notes.values_list("plis", flat=True))
-            .exclude(user__id__in=blocked_users)
+            .exclude(Q(user_id__in=blocked_users) | Q(id__in=blocked_comment_ids))
             .order_by("-created_at")
         )
         # 댓글 가져오기 (최신순)
@@ -110,6 +116,10 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
 
         serialized_comments = []
         if comment is not None:
+            # 대댓글 필터링 (차단한 유저 또는 차단한 대댓글)
+            replies = comment.replies.exclude(
+                Q(user__id__in=blocked_users) | Q(id__in=blocked_reply_ids)
+            )
 
             serialized_comments = [
                 {
@@ -260,6 +270,12 @@ class PliCommentListView(BlockFilterMixin, APIView):
         blocked_users = UserBlock.objects.filter(blocker=user).values_list(
             "blocked_user", flat=True
         )
+        blocked_comment_ids = PliCommentBlock.objects.filter(blocker=user).values_list(
+            "comment_id", flat=True
+        )
+        blocked_reply_ids = PliReplyBlock.objects.filter(blocker=user).values_list(
+            "reply_id", flat=True
+        )
 
         # 댓글 개수 & 스크랩 개수
         comment_count = PliComment.objects.filter(pli=pli).count()
@@ -271,7 +287,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
         # 차단한 유저의 댓글 제외
         comments = (
             PliComment.objects.filter(pli=pli)
-            .exclude(user__id__in=blocked_users)
+            .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_comment_ids))
             .order_by("created_at")
         )
 
@@ -282,7 +298,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
             # 대댓글도 차단한 유저의 것 제외
             replies = (
                 PliReply.objects.filter(comment=comment)
-                .exclude(user__id__in=blocked_users)
+                .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_reply_ids))
                 .order_by("created_at")
             )
 

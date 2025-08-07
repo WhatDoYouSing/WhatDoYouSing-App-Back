@@ -21,8 +21,16 @@
 #         or UserBlock.objects.filter(blocker=user, blocked_user=pli.user).exists()
 #     )
 
-from notes.models import Notes, Plis
-from moderation.models import UserBlock, NoteBlock, PliBlock
+from notes.models import Notes, Plis, NoteComment, NoteReply, PliComment, PliReply
+from moderation.models import (
+    UserBlock,
+    NoteBlock,
+    PliBlock,
+    NoteCommentBlock,
+    NoteReplyBlock,
+    PliCommentBlock,
+    PliReplyBlock,
+)
 
 
 def blocked_user_ids(user) -> set[int]:
@@ -47,6 +55,32 @@ def blocked_item_ids(user, model) -> set[int]:
         return set(
             PliBlock.objects.filter(blocker=user).values_list("pli_id", flat=True)
         )
+
+    if model is NoteComment:
+        return set(
+            NoteCommentBlock.objects.filter(blocker=user).values_list(
+                "comment_id", flat=True
+            )
+        )
+    if model is NoteReply:
+        return set(
+            NoteReplyBlock.objects.filter(blocker=user).values_list(
+                "reply_id", flat=True
+            )
+        )
+    if model is PliComment:
+        return set(
+            PliCommentBlock.objects.filter(blocker=user).values_list(
+                "comment_id", flat=True
+            )
+        )
+    if model is PliReply:
+        return set(
+            PliReplyBlock.objects.filter(blocker=user).values_list(
+                "reply_id", flat=True
+            )
+        )
+
     return set()
 
 
@@ -60,3 +94,27 @@ def is_pli_blocked(user, pli: Plis) -> bool:
     return pli.id in blocked_item_ids(user, Plis) or pli.user_id in blocked_user_ids(
         user
     )
+
+
+def is_note_comment_blocked(user, comment: NoteComment) -> bool:
+    return comment.id in blocked_item_ids(
+        user, NoteComment
+    ) or comment.user_id in blocked_user_ids(user)
+
+
+def is_note_reply_blocked(user, reply: NoteReply) -> bool:
+    return reply.id in blocked_item_ids(
+        user, NoteReply
+    ) or reply.user_id in blocked_user_ids(user)
+
+
+def is_pli_comment_blocked(user, comment: PliComment) -> bool:
+    return comment.id in blocked_item_ids(
+        user, PliComment
+    ) or comment.user_id in blocked_user_ids(user)
+
+
+def is_pli_reply_blocked(user, reply: PliReply) -> bool:
+    return reply.id in blocked_item_ids(
+        user, PliReply
+    ) or reply.user_id in blocked_user_ids(user)
