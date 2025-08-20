@@ -160,10 +160,11 @@ class ActivitySerializer(serializers.ModelSerializer):
         return str(getattr(owner, "nickname", None) or getattr(owner, "username", None))
 
     def get_target_type(self, obj):
+        NO_TARGET_TYPES = {"achievement", "emotion"}
         """
         'note' | 'pli' | None
         """
-        if getattr(obj, "activity_type", None) == "achievement":
+        if getattr(obj, "activity_type", None) in NO_TARGET_TYPES:
             return None
         target = self._get_target_instance(obj)
         original, kind = self._resolve_to_original_post(target)
