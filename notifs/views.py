@@ -10,6 +10,7 @@ from moderation.mixins import BlockFilterMixin
 from moderation.models import UserBlock, NoteBlock, PliBlock
 from accounts.models import User
 from moderation.utils.blocking import blocked_user_ids
+from notes.models import Notes, Plis
 
 
 class NotificationListView(BlockFilterMixin, views.APIView):
@@ -36,6 +37,9 @@ class NotificationMarkReadView(views.APIView):
         return Response({"marked": updated})
 
 
+from django.contrib.contenttypes.models import ContentType
+
+
 class ActivityListView(BlockFilterMixin, views.APIView):
     permission_classes = [IsAuthenticated]
 
@@ -54,8 +58,39 @@ class ActivityListView(BlockFilterMixin, views.APIView):
             owner = getattr(target, "user", None)
             if not owner or owner.id not in blocked_users:
                 filtered_qs.append(act)
+        # --- bulk로 target들 미리 조회해서 매핑 만들기 (ContentType, obj_id 기반) ---
+        # ct_id -> set(obj_ids)
+        ct_obj_ids = {}
+        for act in filtered_qs:
+            if act.ct_id and act.obj_id:
+                ct_obj_ids.setdefault(act.ct_id, set()).add(act.obj_id)
 
-        serializer = ActivitySerializer(filtered_qs, many=True)
+        target_map = {}
+        if ct_obj_ids:
+            for ct_id, obj_ids in ct_obj_ids.items():
+                try:
+                    ct = ContentType.objects.get_for_id(ct_id)
+                except ContentType.DoesNotExist:
+                    continue
+                model = ct.model_class()
+                if model is None:
+                    continue
+
+                # 모델별로 bulk 조회 (Notes, Plis 최적화)
+                if model == Notes:
+                    objs = Notes.objects.filter(id__in=obj_ids).select_related("user")
+                elif model == Plis:
+                    objs = Plis.objects.filter(id__in=obj_ids).select_related("user")
+                else:
+                    objs = model.objects.filter(id__in=obj_ids).select_related("user")
+
+                for o in objs:
+                    target_map[(ct_id, o.id)] = o
+
+        serializer = ActivitySerializer(
+            filtered_qs, many=True, context={"target_map": target_map}
+        )
+
         return Response(serializer.data)
 
 
