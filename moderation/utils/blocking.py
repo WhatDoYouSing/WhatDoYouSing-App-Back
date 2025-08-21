@@ -31,6 +31,7 @@ from moderation.models import (
     PliCommentBlock,
     PliReplyBlock,
 )
+from __future__ import annotations
 
 
 def blocked_user_ids(user) -> set[int]:
