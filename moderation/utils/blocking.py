@@ -31,10 +31,10 @@ from moderation.models import (
     PliCommentBlock,
     PliReplyBlock,
 )
-from __future__ import annotations
+from typing import Set
 
 
-def blocked_user_ids(user) -> set[int]:
+def blocked_user_ids(user) -> Set[int]:
     """작성자 차단 ID 집합"""
     if not user.is_authenticated:
         return set()
@@ -43,7 +43,7 @@ def blocked_user_ids(user) -> set[int]:
     )
 
 
-def blocked_item_ids(user, model) -> set[int]:
+def blocked_item_ids(user, model) -> Set[int]:
     """노트 or 플리 차단 ID 집합"""
     if not user.is_authenticated:
         return set()
