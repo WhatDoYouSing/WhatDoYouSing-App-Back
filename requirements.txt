@@ -18,6 +18,6 @@ tzdata
 requests
 dj-rest-auth
 # 형태소 분석 라이브러리 - 아직 배포 환경에 적용 불가
-KoNLPy>=0.6.0     
-JPype1>=1.4.1    
-spacy>=3.7.2 
+#KoNLPy>=0.6.0     
+#JPype1>=1.4.1    
+#spacy>=3.7.2 
