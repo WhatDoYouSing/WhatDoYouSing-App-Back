@@ -65,7 +65,7 @@ class RandomUsernameView(views.APIView):
         max_attempts = 10  # 중복 방지를 위해 최대 10회 시도
         for _ in range(max_attempts):
             random_username = ''.join(random.choices(chars, k=length))
-            if not User.objects.filter(username=random_username).exists():
+            if not User.objects.filter(serviceID=random_username).exists():
                 return Response({"random_username": random_username}, status=status.HTTP_200_OK)
 
         return Response({"error": "랜덤 아이디 생성에 실패했습니다. 다시 시도해주세요."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

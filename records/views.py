@@ -132,5 +132,5 @@ class WordDetailView(generics.ListAPIView):
             .filter(id__in=note_ids)
             .order_by("created_at")       # 최신순
             .select_related("emotion")     # 필요하다면
-        )
-'''        
+        )  
+'''
