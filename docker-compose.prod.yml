@@ -13,6 +13,7 @@ services:
       - .env
     ports:
       - "8080:8000"  
+      - "8081:8000"
     volumes:
       - static:/home/app/web/static
       - media:/home/app/web/media
