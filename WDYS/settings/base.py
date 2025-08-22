@@ -123,7 +123,7 @@ SIMPLE_JWT = {
 }
 
 MIDDLEWARE = [
-    #'corsheaders.middleware.CorsMiddleware', # 추가
+    'corsheaders.middleware.CorsMiddleware', # 추가
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -131,7 +131,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    #'django.middleware.common.CommonMiddleware', # 추가
     "allauth.account.middleware.AccountMiddleware",  # 추가
 ]
 
@@ -143,7 +142,15 @@ AUTHENTICATION_BACKENDS = [
 CSRF_TRUSTED_ORIGINS = ["https://05b17e3d7f3c.ngrok-free.app"]
 
 # cors
-CORS_ORIGIN_ALLOW_ALL = True
+#CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOWED_ORIGINS = [
+    "https://whatdoyousing.com",               # 프론트 주소
+    "https://whatdoyousing.com",
+    "https://api.whatdoyousing.com:8080",      # 필요 시 프론트에서 직접 API 호출 시
+    "https://api.whatdoyousing.com:8081",      # 포트 8081도 쓰면 필요
+    "http://localhost:3000",                   # 로컬 개발용
+    "http://localhost:8081",
+]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = (
     "DELETE",
