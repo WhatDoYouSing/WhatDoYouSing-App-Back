@@ -24,7 +24,7 @@ class User(AbstractUser):
     profile = models.IntegerField(default=0, verbose_name="프로필", null=True, blank=True)
     title_selection = models.ForeignKey(Title, on_delete=models.CASCADE, verbose_name="현재 칭호", null=True, blank=True)
 
-    # 소셜 로그인 제공자 선택 (애플, 카카오, 구글)s
+    # 소셜 로그인 제공자 선택 (애플, 카카오, 구글)
     auth_provider = models.CharField(
         max_length=50,
         choices=[

@@ -139,7 +139,9 @@ AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
-CSRF_TRUSTED_ORIGINS = ["https://05b17e3d7f3c.ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = [
+    'https://api.whatdoyousing.com'
+]
 
 # cors
 #CORS_ORIGIN_ALLOW_ALL = True

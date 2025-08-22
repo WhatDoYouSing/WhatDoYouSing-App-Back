@@ -3,6 +3,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from .models import *
 import random
+from datetime import datetime
 
 User = get_user_model()
 
@@ -155,8 +156,15 @@ class GeneralSignUpSerializer(AbstractSignupSerializer):
         user.set_password(validated_data['password'])  # 비밀번호 해싱
         user.save()
         return user
-
-
+    
+    def generate_tokens(self, user):
+        token = RefreshToken.for_user(user)
+        return {
+            'access_token': str(token.access_token),
+            'access_token_exp': datetime.fromtimestamp(token.access_token['exp']),
+            'refresh_token': str(token),
+            'refresh_token_exp': datetime.fromtimestamp(token['exp']),
+        }
 
 # ✅ 일반 로그인 Serializer
 class LogInSerializer(serializers.Serializer):
@@ -183,16 +191,16 @@ class LogInSerializer(serializers.Serializer):
         return self.generate_tokens(user)
 
     def generate_tokens(self, user):
-        """토큰 생성"""
         token = RefreshToken.for_user(user)
         return {
             'id': user.id,
             'email': user.email,
             'nickname': user.nickname,
             'profile': user.profile,
-            #'title': TitleSerializer(user.title).data if user.title else None,  # 칭호 추가
             'access_token': str(token.access_token),
+            'access_token_exp': datetime.fromtimestamp(token.access_token['exp']),
             'refresh_token': str(token),
+            'refresh_token_exp': datetime.fromtimestamp(token['exp']),
         }
 
 # 소셜 공통 ############################################################################################    

@@ -247,13 +247,15 @@ class GeneralSignUpView(views.APIView):
     permission_classes = [AllowAny]
     serializer_class = GeneralSignUpSerializer
 
+    # 이메일 인증 미완료 시 가입 못하도록? 가능한가..? 이메일 인증 시 유저 객체 생성을 안해가지고 흠.. 뭐 email_is_verified 이런걸 만들어서
+    # 근데 그걸 만들어도 .. 유저 객체가 만들어지는게 아니잖아.. 그럼 이메일 테이블을 아예 따로 만들어야? (분리해야?)
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
 
         if serializer.is_valid():
             user = serializer.save()
-            self.send_verification(request,user)
-            return Response({'message': '회원가입 성공! 이메일 인증 메일 확인 시 계정이 활성화 됩니다', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            token_data = serializer.generate_tokens(user)
+            return Response({'message': '회원가입 성공!', 'data': serializer.data, 'tokens': token_data}, status=status.HTTP_201_CREATED)
         return Response({'message': '회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 # ✅ [일반] 로그인
