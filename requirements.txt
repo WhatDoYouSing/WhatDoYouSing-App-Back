@@ -17,7 +17,10 @@ typing_extensions==4.12.2
 tzdata
 requests
 dj-rest-auth
-# 형태소 분석 라이브러리 - 아직 배포 환경에 적용 불가
+# 형태소 분석 라이브러리 - 바른 사용 예정; 필요 없음 바른 안정화 되면 지우기
 #KoNLPy>=0.6.0     
 #JPype1>=1.4.1    
 #spacy>=3.7.2 
+# 바른 형태소 라이브러리 & 영어용
+bareunpy 
+spacy>=3.7.2  
