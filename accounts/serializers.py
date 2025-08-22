@@ -338,7 +338,7 @@ class GLogInSerializer(serializers.Serializer):
     
 # 애플 유저 ############################################################################################   
 
-# 📌 애플 회원가입 Serializer
+# ✅ 애플 회원가입 Serializer
 class ASignUpSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -353,7 +353,7 @@ class ASignUpSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
-# 📌 애플 로그인 Serializer
+# ✅ 애플 로그인 Serializer
 class ALogInSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(max_length=128, write_only=True)

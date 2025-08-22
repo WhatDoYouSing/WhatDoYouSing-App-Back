@@ -236,11 +236,11 @@ class VerifyEmailView(views.APIView):
         if not token_valid:
             return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 프론트에서 이 이메일로 본가입 진행하도록 안내
-        return Response({
-            'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
-            'email': email
-        }, status=status.HTTP_200_OK)
+        #return Response({
+        #    'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
+        #    'email': email
+        #}, status=status.HTTP_200_OK)
+        return render(request, "email_verified.html", {"email": email})
 
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
