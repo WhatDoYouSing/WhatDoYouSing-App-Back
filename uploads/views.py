@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from django.db.models import Q, Count
 from django.conf import settings
 
-# import requests
-# import datetime
+import requests
+import datetime
 
 from .serializers import *
 from .models import *
@@ -419,3 +419,29 @@ class PostReportView(views.APIView):
             {"message": f"{report_type}이(가) 신고되었습니다.", "report_id": report.id},
             status=status.HTTP_201_CREATED,
         )
+
+class SpotifyAcessTokenView(views.APIView):
+    def get(self,request):
+        access_token = Spotify.objects.get(id=1).access_token
+        return Response({"message": "Spotify AccessToken 조회 성공", "data": {"access_token":access_token}}, status=status.HTTP_200_OK)
+
+def update_spotify():
+    auth_url = 'https://accounts.spotify.com/api/token'
+    headers = {
+        'content-type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + settings.SPOTIFY_AUTHORIZATION
+    }
+    data = {
+        'grant_type': 'refresh_token',
+        'refresh_token': settings.SPOTIFY_REFRESH_TOKEN,
+        'client_id': settings.SPOTIFY_CLIENT_ID,
+    }
+    auth_response = requests.post(auth_url, headers=headers,data=data)
+    access_token = auth_response.json().get('access_token')
+
+    if Spotify.objects.exists():
+        token = Spotify.objects.get(id=1)
+        token.update_token(access_token)
+    else:
+        token = Spotify(access_token=access_token)
+        token.save()

@@ -81,6 +81,11 @@ class ServiceIDUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id','serviceID']
 
+# ✅ 유저 비밀번호 확인 serializer
+class PasswordCheckSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True)
+
+
 # ✅ 유저 비밀번호 변경 serializer
 class PasswordUpdateSerializer(serializers.Serializer):
     current_password = serializers.CharField(max_length=128, write_only=True)
