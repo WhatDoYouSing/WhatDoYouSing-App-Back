@@ -63,6 +63,10 @@ APPLE_PRIVATE_KEY = serialization.load_pem_private_key(
     backend=default_backend(),
 )
 
+SPOTIFY_REFRESH_TOKEN = env('SPOTIFY_REFRESH_TOKEN')
+SPOTIFY_CLIENT_ID = env('SPOTIFY_CLIENT_ID')
+SPOTIFY_AUTHORIZATION = env('SPOTIFY_AUTHORIZATION')
+
 ALLOWED_HOSTS = ["*"]
 
 # Application definition
@@ -83,6 +87,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "django.contrib.sites",
+    "django_apscheduler",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -104,6 +109,9 @@ INSTALLED_APPS = [
     "uploads",
     "moderation",
 ]
+
+APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"  
+SCHEDULER_DEFAULT = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

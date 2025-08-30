@@ -72,3 +72,10 @@ class PostReport(models.Model):
 
     def __str__(self):
         return f"{self.report_user} reported {self.report_type}#{self.content_id}"
+
+class Spotify(models.Model):
+    access_token = models.CharField(max_length=500)
+
+    def update_token(self, new_token):
+        self.access_token = new_token
+        self.save()

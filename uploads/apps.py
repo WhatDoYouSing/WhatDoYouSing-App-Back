@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from django.conf import settings
 
 
 class UploadsConfig(AppConfig):
@@ -19,3 +20,7 @@ class UploadsConfig(AppConfig):
                 return None
 
         ScrapNotes.content_object = property(_get_content_object)
+
+        if settings.SCHEDULER_DEFAULT:
+            from . import operator
+            operator.start()

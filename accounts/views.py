@@ -117,8 +117,25 @@ class ChangeServiceIDView(views.APIView):
     
         return Response({'message': '서비스 아이디 변경 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+# ✅ [공통] 비밀번호 확인
+class CheckPasswordView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PasswordCheckSerializer
 
-# ✅ [공통] 비밀번호 변경
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            user = request.user
+            current_password = serializer.validated_data["current_password"]
+
+            if not user.check_password(current_password):
+                return Response({'message': '현재 비밀번호가 올바르지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({'message': '비밀번호 확인 성공'}, status=status.HTTP_200_OK)
+
+        return Response({'message': '입력값 오류', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    
+# 📌 [공통] 비밀번호 변경
 class ChangePasswordView(views.APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PasswordUpdateSerializer
@@ -236,11 +253,11 @@ class VerifyEmailView(views.APIView):
         if not token_valid:
             return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 프론트에서 이 이메일로 본가입 진행하도록 안내
-        return Response({
-            'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
-            'email': email
-        }, status=status.HTTP_200_OK)
+        #return Response({
+        #    'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
+        #    'email': email
+        #}, status=status.HTTP_200_OK)
+        return render(request, "email_verified.html", {"email": email})
 
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
