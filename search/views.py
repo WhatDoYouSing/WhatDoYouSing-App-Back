@@ -271,7 +271,7 @@ class SearchView(BlockFilterMixin, views.APIView):
             "SongTitle",
             "Singer",
             "Location",
-            "PlisTitle",
+            "PliTitle",
         ]
         if filter_type not in valid_filters:
             return Response(
@@ -598,7 +598,7 @@ class SearchView(BlockFilterMixin, views.APIView):
                 many=True,
             ).data,
             # ⑥ PlisTitle ─ 플리 자체 제목 (노트엔 해당 없음)
-            "PlisTitle": SearchAllPlisSSPSerializer(
+            "PliTitle": SearchAllPlisSSPSerializer(
                 (plis_qs.filter(title__icontains=keyword) if keyword else plis_qs),
                 many=True,
             ).data,
@@ -665,11 +665,11 @@ class SearchNotesView(BlockFilterMixin, views.APIView):
         if not filter_type:  # 빈 문자열일 경우 전체 결과 반환
             filter_type = "all"
 
-        valid_filters = ["all", "Memo", "Lyrics", "Title", "Singer", "Location"]
+        valid_filters = ["all", "Memo", "Lyrics", "SongTitle", "Singer", "Location"]
         if filter_type not in valid_filters:
             return Response(
                 {
-                    "message": "잘못된 필터 값입니다. 허용된 필터: all, Memo, Lyrics, Title, Singer, Location"
+                    "message": "잘못된 필터 값입니다. 허용된 필터: all, Memo, Lyrics, SongTitle, Singer, Location"
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -793,7 +793,7 @@ class SearchNotesView(BlockFilterMixin, views.APIView):
                 ),
                 many=True,
             ).data,
-            "Title": SearchNotesLTSSerializer(
+            "SongTitle": SearchNotesLTSSerializer(
                 (
                     search_results.filter(song_title__icontains=keyword)
                     if keyword
@@ -844,11 +844,11 @@ class SearchPlisView(BlockFilterMixin, views.APIView):
         if not filter_type:  # 빈 문자열일 경우 전체 결과 반환
             filter_type = "all"
 
-        valid_filters = ["all", "Memo", "Lyrics", "SongTitle", "Singer", "PlisTitle"]
+        valid_filters = ["all", "Memo", "Lyrics", "SongTitle", "Singer", "PliTitle"]
         if filter_type not in valid_filters:
             return Response(
                 {
-                    "message": "잘못된 필터 값입니다. 허용된 필터: all, Memo, Lyrics, SongTitle, Singer, PlisTitle"
+                    "message": "잘못된 필터 값입니다. 허용된 필터: all, Memo, Lyrics, SongTitle, Singer, PliTitle"
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -990,7 +990,7 @@ class SearchPlisView(BlockFilterMixin, views.APIView):
                 ),
                 many=True,
             ).data,
-            "PlisTitle": SearchPlisLSSPSerializer(
+            "PliTitle": SearchPlisLSSPSerializer(
                 (
                     search_results.filter(title__icontains=keyword)
                     if keyword
