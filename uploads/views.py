@@ -22,8 +22,12 @@ from collects.models import ScrapList, ScrapNotes
 
 # 노트 업로드(음원)
 class SongNoteUploadView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request):
-        serializer = Song_NotesUploadSerializer(data=request.data)
+        serializer = Song_NotesUploadSerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             note = serializer.save(user=request.user)
             # 태그 개수 카운팅팅
@@ -55,8 +59,12 @@ class SongNoteUploadView(views.APIView):
 
 # 노트 업로드(유튜브)
 class YTNoteUploadView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request):
-        serializer = YT_NotesUploadSerializer(data=request.data)
+        serializer = YT_NotesUploadSerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             note = serializer.save(user=request.user)
             # 태그 개수 카운팅팅
@@ -88,8 +96,12 @@ class YTNoteUploadView(views.APIView):
 
 # 노트 업로드(직접)
 class NoteUploadView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request):
-        serializer = NotesUploadSerializer(data=request.data)
+        serializer = NotesUploadSerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             note = serializer.save(user=request.user)
             # 태그 개수 카운팅
@@ -141,7 +153,10 @@ class NoteUpdateView(views.APIView):
         # 2) Serializer에 데이터 던져서 업데이트
         #    (YT serializer는 link 필드까지 포함하므로 범용으로 사용)
         serializer = YT_NotesUploadSerializer(
-            note, data=request.data, partial=True  # 부분 수정 허용
+            note,
+            data=request.data,
+            partial=True,
+            context={"request": request},  # 부분 수정 허용
         )
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -184,6 +199,8 @@ class NoteUpdateView(views.APIView):
 
 # 노트 삭제
 class NoteDelView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def delete(self, request, pk, format=None):
         note = get_object_or_404(Notes, pk=pk)
         if request.user == note.user:
@@ -199,6 +216,8 @@ class NoteDelView(views.APIView):
 
 # 플리 생성 시 노트 목록
 class NoteListView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request, format=None):
 
         keyword = request.GET.get("keyword")
@@ -248,6 +267,8 @@ class ScrapNotesForPlisView(views.APIView):
 
 # 플리 생성
 class PliUploadView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request, format=None):
         serializer = PliUploadSerializer(
             data=request.data, context={"request": request}
@@ -334,6 +355,8 @@ class PliUpdateView(views.APIView):
 
 # 플리 삭제
 class PliDelView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def delete(self, request, pk, format=None):
         pli = get_object_or_404(Plis, pk=pk)
         if request.user == pli.user:
