@@ -51,7 +51,79 @@ class OthersPageView(views.APIView):
             'data': serializer.data,
             'follow_status': follow_status
         }, status=status.HTTP_200_OK)
-    
+   
+# ✅ [타인-마이페이지] 통합/노트/플리 가져오기
+class OthersContentView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user_id = request.query_params.get("id", None)
+        content_type = request.query_params.get("type", None)
+        date_str = request.query_params.get("date", None)
+
+        if not user_id:
+            return Response({"message": "유저 ID가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"message": "해당 유저를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        me = request.user
+
+        i_follow = UserFollows.objects.filter(follower=me, following=target_user).exists()
+        they_follow = UserFollows.objects.filter(follower=target_user, following=me).exists()
+
+        if i_follow and they_follow:
+            follow_status = "mutual"
+        elif i_follow:
+            follow_status = "following"
+        elif they_follow:
+            follow_status = "follower"
+        else:
+            follow_status = "none"
+
+        start_date = end_date = None
+        if date_str:
+            try:
+                year, month = map(int, date_str.split('-'))
+                start_date = datetime(year, month, 1)
+                last_day = monthrange(year, month)[1]
+                end_date = datetime(year, month, last_day, 23, 59, 59)
+            except ValueError:
+                return Response({"message": "잘못된 날짜 형식입니다. YYYY-MM 형식으로 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+        visibility_filters = ["public"]
+        if follow_status == "mutual":
+            visibility_filters.append("friends")
+
+        notes = Notes.objects.filter(user=target_user, visibility__in=visibility_filters)
+        plis = Plis.objects.filter(user=target_user, visibility__in=visibility_filters)
+
+        if start_date and end_date:
+            notes = notes.filter(created_at__range=(start_date, end_date))
+            plis = plis.filter(created_at__range=(start_date, end_date))
+
+        if content_type == "note":
+            serializer = MyNoteSerializer(notes.order_by('-created_at'), many=True)
+            return Response(serializer.data)
+
+        elif content_type == "pli":
+            serializer = MyPliSerializer(plis.order_by('-created_at'), many=True)
+            return Response(serializer.data)
+
+        combined_content = list(notes) + list(plis)
+        combined_content.sort(key=lambda x: x.created_at, reverse=True)
+
+        serialized_data = []
+        for content in combined_content:
+            if isinstance(content, Notes):
+                serialized_data.append(MyNoteSerializer(content).data)
+            elif isinstance(content, Plis):
+                serialized_data.append(MyPliSerializer(content).data)
+
+        return Response(serialized_data, status=status.HTTP_200_OK)
+
 # ✅ [마이페이지] 기본 정보
 class MyPageView(views.APIView):
     permission_classes = [IsAuthenticated]
