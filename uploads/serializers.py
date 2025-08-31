@@ -41,17 +41,25 @@ class Song_NotesUploadSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
+        if "link" not in validated_data or validated_data.get("link") is None:
+            validated_data["link"] = ""
+
         tag_time_data = validated_data.pop("tag_time", [])
         tag_season_data = validated_data.pop("tag_season", [])
         tag_context_data = validated_data.pop("tag_context", [])
-        note = Notes.objects.create(**validated_data)
+
+        # context로 전달된 request에서 user 가져오기 (뷰에서 context={'request': request} 전달 필요)
+        request_obj = self.context.get("request") if self.context else None
+        user = getattr(request_obj, "user", None)
+
+        note = Notes.objects.create(user=user, **validated_data)
         note.tag_time.set(tag_time_data)
         note.tag_season.set(tag_season_data)
         note.tag_context.set(tag_context_data)
         return note
 
 
-# 노트 업로드(음원)
+# 노트 업로드(유튜브)
 class YT_NotesUploadSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     tag_time = serializers.PrimaryKeyRelatedField(
@@ -89,7 +97,11 @@ class YT_NotesUploadSerializer(serializers.ModelSerializer):
         tag_time_data = validated_data.pop("tag_time", [])
         tag_season_data = validated_data.pop("tag_season", [])
         tag_context_data = validated_data.pop("tag_context", [])
-        note = Notes.objects.create(**validated_data)
+
+        request_obj = self.context.get("request") if self.context else None
+        user = getattr(request_obj, "user", None)
+
+        note = Notes.objects.create(user=user, **validated_data)
         note.tag_time.set(tag_time_data)
         note.tag_season.set(tag_season_data)
         note.tag_context.set(tag_context_data)
@@ -103,7 +115,7 @@ DEFAULT_ALBUM_ART_IMAGES = [
 ]
 
 
-# 노트 업로드(음원)
+# 노트 업로드(직접)
 class NotesUploadSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     tag_time = serializers.PrimaryKeyRelatedField(
@@ -115,22 +127,6 @@ class NotesUploadSerializer(serializers.ModelSerializer):
     tag_context = serializers.PrimaryKeyRelatedField(
         many=True, queryset=Contexts.objects.all(), required=False
     )
-
-    def create(self, validated_data):
-        # 만약 album_art 필드에 값이 없거나 비어 있다면 기본 이미지를 할당
-        if not validated_data.get("album_art"):
-            validated_data["album_art"] = random.choice(DEFAULT_ALBUM_ART_IMAGES)
-        return super().create(validated_data)
-
-    def create(self, validated_data):
-        tag_time_data = validated_data.pop("tag_time", [])
-        tag_season_data = validated_data.pop("tag_season", [])
-        tag_context_data = validated_data.pop("tag_context", [])
-        note = Notes.objects.create(**validated_data)
-        note.tag_time.set(tag_time_data)
-        note.tag_season.set(tag_season_data)
-        note.tag_context.set(tag_context_data)
-        return note
 
     class Meta:
         model = Notes
@@ -151,6 +147,28 @@ class NotesUploadSerializer(serializers.ModelSerializer):
             "tag_context",
             "created_at",
         ]
+
+    def create(self, validated_data):
+        # 만약 album_art 필드에 값이 없거나 비어 있다면 기본 이미지를 할당
+        if not validated_data.get("album_art"):
+            validated_data["album_art"] = random.choice(DEFAULT_ALBUM_ART_IMAGES)
+        # return super().create(validated_data)
+        # link 방어 (song 업로드 같은 케이스에서 link가 없으면 빈 문자열)
+        if "link" not in validated_data or validated_data.get("link") is None:
+            validated_data["link"] = ""
+
+        tag_time_data = validated_data.pop("tag_time", [])
+        tag_season_data = validated_data.pop("tag_season", [])
+        tag_context_data = validated_data.pop("tag_context", [])
+
+        request_obj = self.context.get("request") if self.context else None
+        user = getattr(request_obj, "user", None)
+
+        note = Notes.objects.create(user=user, **validated_data)
+        note.tag_time.set(tag_time_data)
+        note.tag_season.set(tag_season_data)
+        note.tag_context.set(tag_context_data)
+        return note
 
 
 # My 노트 리스트
@@ -242,7 +260,10 @@ class PliUploadSerializer(serializers.ModelSerializer):
         tag_context_data = validated_data.pop("tag_context", [])
         plinotes_data = validated_data.pop("plinotes", [])
 
-        plis = Plis.objects.create(user=self.context["request"].user, **validated_data)
+        request_obj = self.context.get("request") if self.context else None
+        user = getattr(request_obj, "user", None)
+
+        plis = Plis.objects.create(user=user, **validated_data)
         plis.tag_time.set(tag_time_data)
         plis.tag_season.set(tag_season_data)
         plis.tag_context.set(tag_context_data)
