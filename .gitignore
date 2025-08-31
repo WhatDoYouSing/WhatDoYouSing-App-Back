@@ -3,6 +3,8 @@ myvenv/
 newvenv/
 newvenv
 
+spotify-tokens.py
+
 *.p8
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,django

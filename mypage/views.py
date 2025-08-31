@@ -9,9 +9,49 @@ from django.db.models import Max
 from django.utils.dateparse import parse_date
 from calendar import monthrange
 from django.utils.dateparse import parse_date
+from social.models import *
 
 # Create your views here.
 
+# ✅ [타인-마이페이지] 기본 정보
+class OthersPageView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MyPageSerializer
+
+    def get(self, request):
+        user_id = request.query_params.get("id", None)
+
+        if user_id is None:
+            return Response({'message': '유저 ID가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'message': '해당 유저를 찾을 수 없습니다.'}, status=status.HTTP_404_NOT_FOUND)
+
+        me = request.user
+
+        # 팔로우 관계 확인
+        i_follow = UserFollows.objects.filter(follower=me, following=target_user).exists()
+        they_follow = UserFollows.objects.filter(follower=target_user, following=me).exists()
+
+        if i_follow and they_follow:
+            follow_status = "mutual"
+        elif i_follow:
+            follow_status = "following"
+        elif they_follow:
+            follow_status = "follower"
+        else:
+            follow_status = "none"
+
+        serializer = self.serializer_class(target_user)
+
+        return Response({
+            'message': '타인 마이페이지 조회 성공',
+            'data': serializer.data,
+            'follow_status': follow_status
+        }, status=status.HTTP_200_OK)
+    
 # ✅ [마이페이지] 기본 정보
 class MyPageView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -144,7 +184,7 @@ class NicknameUpdateView(views.APIView):
             return Response({'message': '서비스 아이디 변경 성공', 'data': serializer.validated_data}, status=status.HTTP_200_OK)
     
         return Response({'message': '서비스 아이디 변경 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
+'''
 # 📌 [마이페이지] 달력 뷰
 class MyCalendarView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -189,3 +229,4 @@ class MyCalendarView(views.APIView):
             {"message": "달력 데이터 조회 성공", "data": content_by_date}, 
             status=status.HTTP_200_OK
         )
+'''
