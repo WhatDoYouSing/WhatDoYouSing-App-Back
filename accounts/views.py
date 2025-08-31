@@ -258,27 +258,12 @@ class VerifyEmailView(views.APIView):
         #    'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
         #    'email': email
         #}, status=status.HTTP_200_OK)
-        #return render(request, "email_verified.html", {"email": email})
-
-        return HttpResponse(f"""
-        <!DOCTYPE html>
-        <html lang="ko">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>이메일 인증 완료</title>
-            <style>
-                body {{ text-align: center; padding: 40px; font-family: sans-serif; }}
-                a {{ background: #000; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; }}
-            </style>
-        </head>
-        <body>
-            <h2>이메일 인증 완료 ✅</h2>
-            <p>{email} 이메일 인증이 정상적으로 완료되었습니다.</p>
-            <a href="whatdoyousing://verified">앱에서 계속하기</a>
-        </body>
-        </html>
-        """)
+        return render(
+            request,
+            "email_verified.html",
+            {"email": email},
+            content_type="text/html"
+        )
 
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
