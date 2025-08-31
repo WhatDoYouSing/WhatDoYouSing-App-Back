@@ -29,7 +29,8 @@ class SongNoteUploadView(views.APIView):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
-            note = serializer.save(user=request.user)
+            # note = serializer.save(user=request.user)
+            note = serializer.save()
             # 태그 개수 카운팅팅
             if note.emotion:
                 note.emotion.count += 1
@@ -66,7 +67,8 @@ class YTNoteUploadView(views.APIView):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
-            note = serializer.save(user=request.user)
+            # note = serializer.save(user=request.user)
+            note = serializer.save()
             # 태그 개수 카운팅팅
             if note.emotion:
                 note.emotion.count += 1
@@ -103,7 +105,8 @@ class NoteUploadView(views.APIView):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
-            note = serializer.save(user=request.user)
+            # note = serializer.save(user=request.user)
+            note = serializer.save()
             # 태그 개수 카운팅
             if note.emotion:
                 note.emotion.count += 1
