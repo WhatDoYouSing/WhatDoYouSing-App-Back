@@ -197,7 +197,9 @@ class PliNoteUploadSerializer(serializers.ModelSerializer):
         queryset=Notes.objects.all()
     )  # 노트 ID를 입력받아야 하므로 PrimaryKeyRelatedField로 설정
     selected_notes = PliNotesSerializer(source="notes", read_only=True)
-    note_memo = serializers.CharField()
+    note_memo = serializers.CharField(
+        required=False, allow_blank=True
+    )  # 노트 메모 공란 가능하도록
 
     class Meta:
         model = PliNotes
@@ -247,7 +249,7 @@ class PliUploadSerializer(serializers.ModelSerializer):
 
         for plinote_item in plinotes_data:
             note = plinote_item["notes"]  # 선택된 노트 ID
-            note_memo = plinote_item["note_memo"]  # 메모
+            note_memo = plinote_item.get("note_memo", "")  # 없으면 빈 문자열
 
             PliNotes.objects.create(
                 plis=plis,  # 플리와 연결
@@ -281,10 +283,12 @@ class PliUploadSerializer(serializers.ModelSerializer):
             instance.plinotes.all().delete()
             # (새로 받은 것들로 만들기)
             for item in plinotes_data:
+                note = item["notes"]
+                note_memo = item.get("note_memo", "")
                 PliNotes.objects.create(
                     plis=instance,
-                    notes=item["notes"],
-                    note_memo=item["note_memo"],
+                    notes=note,
+                    note_memo=note_memo,
                 )
 
         return instance
