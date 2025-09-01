@@ -467,59 +467,79 @@ class NoteCommentListView(BlockFilterMixin, APIView):
         # 부모 댓글 (최상위 댓글) 가져오기
         # comments = NoteComment.objects.filter(note=note).order_by("created_at")
         # 차단한 유저의 댓글 제외
-        comments = (
-            NoteComment.objects.filter(note=note)
-            .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_comment_ids))
-            .order_by("created_at")
-        )
+        # 부모 댓글
+        comments = NoteComment.objects.filter(note=note).order_by("created_at")
 
-        # 댓글 직렬화
         serialized_comments = []
         for comment in comments:
-            # replies = NoteReply.objects.filter(comment=comment).order_by("created_at")
-            # 차단한 유저의 대댓글 제외
-            replies = (
-                NoteReply.objects.filter(comment=comment)
-                .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_reply_ids))
-                .order_by("created_at")
+            is_blocked_comment = (
+                comment.user.id in blocked_users or comment.id in blocked_comment_ids
             )
 
-            serialized_replies = [
-                {
-                    "id": reply.id,
-                    "user": {
-                        "id": reply.user.id,
-                        "username": reply.user.serviceID,
-                        "nickname": reply.user.nickname,
-                        "profile": reply.user.profile,
-                    },
-                    "parent_nickname": comment.user.nickname,  # 부모 댓글의 닉네임 (언급된 닉네임)
-                    "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
-                    "content": reply.content,
-                    "likes_count": reply.likes.count(),
-                    "mine": reply.user == user,  # 현재 유저가 작성한 경우 true
-                }
-                for reply in replies
-            ]
+            # 대댓글
+            replies = NoteReply.objects.filter(comment=comment).order_by("created_at")
 
-            serialized_comments.append(
-                {
-                    "id": comment.id,
-                    "user": {
-                        "id": comment.user.id,
-                        "username": comment.user.serviceID,
-                        "nickname": comment.user.nickname,
-                        "profile": comment.user.profile,
-                    },
-                    "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
-                    "content": comment.content,
-                    "reply_count": replies.count(),
-                    "likes_count": comment.likes.count(),
-                    "mine": comment.user == user,  # 현재 유저가 작성한 경우 true
-                    "replies": serialized_replies,
-                }
-            )
+            serialized_replies = []
+            for reply in replies:
+                is_blocked_reply = (
+                    reply.user.id in blocked_users or reply.id in blocked_reply_ids
+                )
+                if is_blocked_reply:
+                    serialized_replies.append(
+                        {
+                            "id": reply.id,
+                            "blocked": True,
+                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                        }
+                    )
+                else:
+                    serialized_replies.append(
+                        {
+                            "id": reply.id,
+                            "user": {
+                                "id": reply.user.id,
+                                "username": reply.user.serviceID,
+                                "nickname": reply.user.nickname,
+                                "profile": reply.user.profile,
+                            },
+                            "parent_nickname": comment.user.nickname,  # 부모 댓글의 닉네임 (언급된 닉네임)
+                            "blocked": False,
+                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                            "content": reply.content,
+                            "likes_count": reply.likes.count(),
+                            "mine": reply.user == user,  # 현재 유저가 작성한 경우 true
+                        }
+                    )
 
+            # 댓글 직렬화
+            if is_blocked_comment:
+                serialized_comments.append(
+                    {
+                        "id": comment.id,
+                        "blocked": True,
+                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "replies": serialized_replies,
+                    }
+                )
+            else:
+                serialized_comments.append(
+                    {
+                        "id": comment.id,
+                        "user": {
+                            "id": comment.user.id,
+                            "username": comment.user.serviceID,
+                            "nickname": comment.user.nickname,
+                            "profile": comment.user.profile,
+                        },
+                        "blocked": False,
+                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "content": comment.content,
+                        "reply_count": replies.count(),
+                        "likes_count": comment.likes.count(),
+                        "mine": comment.user == user,
+                        "replies": serialized_replies,
+                    }
+                )
         return Response(
             {
                 "message": "댓글 조회 성공",
@@ -532,6 +552,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 
 class NoteCommentEditDeleteView(APIView):
