@@ -31,7 +31,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
         # 노트 가져오기
         note = get_object_or_404(Notes, id=note_id)
 
-        # ✅ 차단한 유저 or 차단한 노트라면 접근 차단
+        # 차단한 유저 or 차단한 노트라면 접근 차단
         blocked_user_exists = UserBlock.objects.filter(
             blocker=user, blocked_user=note.user
         ).exists()
@@ -67,6 +67,9 @@ class NoteDetailView(BlockFilterMixin, APIView):
             .values("emotion__name")
             .annotate(count=Count("id"))
         )
+
+        my_emotion_obj = NoteEmotion.objects.filter(note=note, user=user).first()
+        my_emotion = my_emotion_obj.emotion.name if my_emotion_obj else None
 
         # 태그 가져오기
         tags = (
@@ -181,6 +184,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
                 {"emotion": e["emotion__name"], "count": e["count"]}
                 for e in emotion_counts
             ],
+            "my_emotion": my_emotion,
             "comment_count": comments.count(),
             "scrap_count": ScrapNotes.objects.filter(content_id=note.id).count(),
             "comment": [
@@ -214,37 +218,41 @@ class NoteEmotionToggleView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, note_id, emotion_name):
-        user = request.user  # 현재 요청한 사용자
+        user = request.user
         note = get_object_or_404(Notes, id=note_id)
         emotion = get_object_or_404(Emotions, name=emotion_name)
 
-        # 기존 감정이 있는지 확인
-        existing_emotion = NoteEmotion.objects.filter(
-            note=note, user=user, emotion=emotion
-        ).first()
+        # 기존 감정 가져오기
+        existing_emotion = NoteEmotion.objects.filter(note=note, user=user).first()
 
-        if existing_emotion:
-            # 이미 감정이 있으면 삭제 (감정 취소)
+        # 같은 감정을 다시 눌렀을 경우 → 취소
+        if existing_emotion and existing_emotion.emotion == emotion:
             existing_emotion.delete()
             Emotions.objects.filter(id=emotion.id).update(count=F("count") - 1)
             return Response(
                 {"message": f"'{emotion_name}' 감정이 취소되었습니다."},
                 status=status.HTTP_200_OK,
             )
-        else:
-            # 새로운 감정 추가
-            try:
-                NoteEmotion.objects.create(note=note, user=user, emotion=emotion)
-                Emotions.objects.filter(id=emotion.id).update(count=F("count") + 1)
-                return Response(
-                    {"message": f"'{emotion_name}' 감정이 추가되었습니다."},
-                    status=status.HTTP_201_CREATED,
-                )
-            except IntegrityError:
-                return Response(
-                    {"error": "감정 추가 중 오류가 발생했습니다."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+
+        # 다른 감정을 이미 남겼으면 → 그거 삭제
+        if existing_emotion:
+            Emotions.objects.filter(id=existing_emotion.emotion.id).update(count=F("count") - 1)
+            existing_emotion.delete()
+
+        # 새로운 감정 추가
+        try:
+            NoteEmotion.objects.create(note=note, user=user, emotion=emotion)
+            Emotions.objects.filter(id=emotion.id).update(count=F("count") + 1)
+            return Response(
+                {"message": f"'{emotion_name}' 감정이 추가되었습니다."},
+                status=status.HTTP_201_CREATED,
+            )
+        except IntegrityError:
+            return Response(
+                {"error": "감정 추가 중 오류가 발생했습니다."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 
 class SameUserContentsView(APIView):
@@ -313,16 +321,16 @@ class SameSongNoteView(APIView):
             Notes.objects.filter(
                 Q(
                     user=user, song_title=note.song_title, artist=note.artist
-                )  # ✅ 내 노트는 다 포함
+                )  # 내 노트는 다 포함
                 | Q(
                     user__in=friends,
                     visibility="friends",
                     song_title=note.song_title,
                     artist=note.artist,
-                )  # ✅ 친구면 friends 포함
+                )  # 친구면 friends 포함
                 | Q(
                     visibility="public", song_title=note.song_title, artist=note.artist
-                )  # ✅ 일반 사용자는 public만
+                )  # 일반 사용자는 public만
             )
             .exclude(id=note.id)
             .order_by("-created_at")
@@ -452,6 +460,10 @@ class NoteCommentListView(BlockFilterMixin, APIView):
         comment_count = NoteComment.objects.filter(note=note).count()
         scrap_count = ScrapNotes.objects.filter(content_id=note_id).count()
 
+        is_collected = ScrapNotes.objects.filter(
+            scrap_list__user=user, content_id=note_id
+        ).exists()
+
         # 부모 댓글 (최상위 댓글) 가져오기
         # comments = NoteComment.objects.filter(note=note).order_by("created_at")
         # 차단한 유저의 댓글 제외
@@ -514,6 +526,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                 "data": {
                     "comment_count": comment_count,
                     "scrap_count": scrap_count,
+                    "is_collected": is_collected,
                     "comments": serialized_comments,
                 },
             },
@@ -657,3 +670,52 @@ class ReportCommentView(APIView):
             {"message": f"{report_type}이(가) 신고되었습니다."},
             status=status.HTTP_201_CREATED,
         )
+
+
+class ToggleLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, content_id):
+        user = request.user
+        content_type = request.query_params.get("type")   # note / pli
+        level = request.query_params.get("level")        # comment / reply
+
+        if not (content_type and level and content_id):
+            return Response({"message": "type, level, id 파라미터가 필요합니다."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        model = None
+        if content_type == "note" and level == "comment":
+            model = NoteComment
+        elif content_type == "note" and level == "reply":
+            model = NoteReply
+        elif content_type == "pli" and level == "comment":
+            model = PliComment
+        elif content_type == "pli" and level == "reply":
+            model = PliReply
+
+        if not model:
+            return Response({"message": "유효하지 않은 type/level 입니다."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        obj = get_object_or_404(model, id=content_id)
+
+        # 좋아요 토글
+        if obj.likes.filter(id=user.id).exists():
+            obj.likes.remove(user)
+            liked = False
+            action = "좋아요 취소"
+        else:
+            obj.likes.add(user)
+            liked = True
+            action = "좋아요"
+
+        message = f"{content_type}/{level}의 {obj.id}번 {level}이 {action}되었습니다."
+
+        data = {
+            "id": obj.id,
+            "likes_count": obj.likes.count(),
+            "liked": liked,
+        }
+
+        return Response({"message": message, "data": data}, status=status.HTTP_200_OK)
