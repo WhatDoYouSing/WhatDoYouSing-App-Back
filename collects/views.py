@@ -123,6 +123,8 @@ class ScrapListView(APIView):
                 "name": scrap_list.name,
                 "album_art": album_arts,  # 최대 4개의 앨범 아트를 저장할 리스트
                 "subtitle": subtitle,
+                "note_count":note_count,
+                "pli_count":pli_count
             }
 
             # 최종적으로 보관함 데이터를 리스트에 추가
@@ -285,6 +287,8 @@ class ScrapListCheckView(APIView):
                 "name": scrap_list.name,
                 "album_art": album_arts,  # 최대 4개의 앨범 아트를 저장할 리스트
                 "subtitle": subtitle,
+                "note_count":note_count,
+                "pli_count":pli_count,
                 "collect": is_collected,
             }
 
