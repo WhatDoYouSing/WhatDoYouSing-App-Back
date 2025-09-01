@@ -31,7 +31,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
         # 노트 가져오기
         note = get_object_or_404(Notes, id=note_id)
 
-        # ✅ 차단한 유저 or 차단한 노트라면 접근 차단
+        # 차단한 유저 or 차단한 노트라면 접근 차단
         blocked_user_exists = UserBlock.objects.filter(
             blocker=user, blocked_user=note.user
         ).exists()
@@ -67,6 +67,9 @@ class NoteDetailView(BlockFilterMixin, APIView):
             .values("emotion__name")
             .annotate(count=Count("id"))
         )
+
+        my_emotion_obj = NoteEmotion.objects.filter(note=note, user=user).first()
+        my_emotion = my_emotion_obj.emotion.name if my_emotion_obj else None
 
         # 태그 가져오기
         tags = (
@@ -181,6 +184,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
                 {"emotion": e["emotion__name"], "count": e["count"]}
                 for e in emotion_counts
             ],
+            "my_emotion": my_emotion,
             "comment_count": comments.count(),
             "scrap_count": ScrapNotes.objects.filter(content_id=note.id).count(),
             "comment": [
