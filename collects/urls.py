@@ -9,5 +9,6 @@ urlpatterns = [
     path('listcheck/<str:type>/<int:content_id>/', ScrapListCheckView.as_view()),
     path('detail/<int:scrap_list_id>/',ScrapListDetailView.as_view()),
     path('new/', ScrapListCreateView.as_view()),
-    path('edit/<int:scrap_list_id>/',ScrapListEditView.as_view())
+    path('edit/<int:scrap_list_id>/',ScrapListEditView.as_view()),
+    path("delete/<int:content_id>/", ScrapListDeleteView.as_view()),
 ]

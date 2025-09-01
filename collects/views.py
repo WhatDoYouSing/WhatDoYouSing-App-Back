@@ -420,3 +420,26 @@ class ScrapListEditView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+# 보관함 삭제 
+class ScrapListDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, content_id):
+        user = request.user
+        scrap_list = get_object_or_404(ScrapList, id=content_id)
+
+        # 본인 소유 여부 확인
+        if scrap_list.user != user:
+            return Response(
+                {"message": "본인의 보관함만 삭제할 수 있습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        name = scrap_list.name
+        scrap_list.delete() 
+
+        return Response(
+            {"message": f"보관함 '{name}' 및 그 안의 노트/플리가 삭제되었습니다."},
+            status=status.HTTP_200_OK,
+        )
