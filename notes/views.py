@@ -657,3 +657,52 @@ class ReportCommentView(APIView):
             {"message": f"{report_type}이(가) 신고되었습니다."},
             status=status.HTTP_201_CREATED,
         )
+
+
+class ToggleLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, content_id):
+        user = request.user
+        content_type = request.query_params.get("type")   # note / pli
+        level = request.query_params.get("level")        # comment / reply
+
+        if not (content_type and level and content_id):
+            return Response({"message": "type, level, id 파라미터가 필요합니다."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        model = None
+        if content_type == "note" and level == "comment":
+            model = NoteComment
+        elif content_type == "note" and level == "reply":
+            model = NoteReply
+        elif content_type == "pli" and level == "comment":
+            model = PliComment
+        elif content_type == "pli" and level == "reply":
+            model = PliReply
+
+        if not model:
+            return Response({"message": "유효하지 않은 type/level 입니다."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        obj = get_object_or_404(model, id=content_id)
+
+        # 좋아요 토글
+        if obj.likes.filter(id=user.id).exists():
+            obj.likes.remove(user)
+            liked = False
+            action = "좋아요 취소"
+        else:
+            obj.likes.add(user)
+            liked = True
+            action = "좋아요"
+
+        message = f"{content_type}/{level}의 {obj.id}번 {level}이 {action}되었습니다."
+
+        data = {
+            "id": obj.id,
+            "likes_count": obj.likes.count(),
+            "liked": liked,
+        }
+
+        return Response({"message": message, "data": data}, status=status.HTTP_200_OK)
