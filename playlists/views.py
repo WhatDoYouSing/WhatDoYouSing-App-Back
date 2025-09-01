@@ -56,9 +56,12 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
 
         # 플리에 포함된 노트 리스트 가져오기
         pli_notes = PliNotes.objects.filter(plis=pli)
+        blocked_note_ids = NoteBlock.objects.filter(blocker=user).values_list("note_id", flat=True)
         note_data = []
         for pli_note in pli_notes:
             note = pli_note.notes
+
+            is_blocked = note.id in blocked_note_ids
 
             # 노트 접근 권한 확인
             if (
@@ -82,6 +85,7 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
                     "album_art": note.album_art,
                     "note_memo": pli_note.note_memo,
                     "can_access": can_access_note,
+                    "blocked": is_blocked,
                 }
             )
 
@@ -286,62 +290,78 @@ class PliCommentListView(BlockFilterMixin, APIView):
             scrap_list__user=user, content_id=pli_id
         ).exists()
 
-        # 부모 댓글 (최상위 댓글) 가져오기
-        # comments = PliComment.objects.filter(pli=pli).order_by("created_at")
+        # 부모 댓글
+        comments = PliComment.objects.filter(pli=pli).order_by("created_at")
 
-        # 차단한 유저의 댓글 제외
-        comments = (
-            PliComment.objects.filter(pli=pli)
-            .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_comment_ids))
-            .order_by("created_at")
-        )
-
-        # 댓글 직렬화
         serialized_comments = []
         for comment in comments:
-            # replies = PliReply.objects.filter(comment=comment).order_by("created_at")
-            # 대댓글도 차단한 유저의 것 제외
-            replies = (
-                PliReply.objects.filter(comment=comment)
-                .exclude(Q(user__id__in=blocked_users) | Q(id__in=blocked_reply_ids))
-                .order_by("created_at")
+            is_blocked_comment = (
+                comment.user.id in blocked_users or comment.id in blocked_comment_ids
             )
 
-            serialized_replies = [
-                {
-                    "id": reply.id,
-                    "user": {
-                        "id": reply.user.id,
-                        "username": reply.user.serviceID,
-                        "nickname": reply.user.nickname,
-                        "profile": reply.user.profile,
-                    },
-                    "parent_nickname": comment.user.nickname,  # 부모 댓글의 닉네임 (언급된 닉네임)
-                    "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
-                    "content": reply.content,
-                    "likes_count": reply.likes.count(),
-                    "mine": reply.user == user,  # 현재 유저가 작성한 경우 true
-                }
-                for reply in replies
-            ]
+            # 대댓글 전체
+            replies = PliReply.objects.filter(comment=comment).order_by("created_at")
 
-            serialized_comments.append(
-                {
-                    "id": comment.id,
-                    "user": {
-                        "id": comment.user.id,
-                        "username": comment.user.serviceID,
-                        "nickname": comment.user.nickname,
-                        "profile": comment.user.profile,
-                    },
-                    "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
-                    "content": comment.content,
-                    "reply_count": replies.count(),
-                    "likes_count": comment.likes.count(),
-                    "mine": comment.user == user,  # 현재 유저가 작성한 경우 true
-                    "replies": serialized_replies,
-                }
-            )
+            serialized_replies = []
+            for reply in replies:
+                is_blocked_reply = (
+                    reply.user.id in blocked_users or reply.id in blocked_reply_ids
+                )
+                if is_blocked_reply:
+                    serialized_replies.append(
+                        {
+                            "id": reply.id,
+                            "blocked": True,
+                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                        }
+                    )
+                else:
+                    serialized_replies.append(
+                        {
+                            "id": reply.id,
+                            "user": {
+                                "id": reply.user.id,
+                                "username": reply.user.serviceID,
+                                "nickname": reply.user.nickname,
+                                "profile": reply.user.profile,
+                            },
+                            "parent_nickname": comment.user.nickname,
+                            "blocked": False,
+                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                            "content": reply.content,
+                            "likes_count": reply.likes.count(),
+                            "mine": reply.user == user,
+                        }
+                    )
+
+            if is_blocked_comment:
+                serialized_comments.append(
+                    {
+                        "id": comment.id,
+                        "blocked": True,
+                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "replies": serialized_replies,
+                    }
+                )
+            else:
+                serialized_comments.append(
+                    {
+                        "id": comment.id,
+                        "user": {
+                            "id": comment.user.id,
+                            "username": comment.user.serviceID,
+                            "nickname": comment.user.nickname,
+                            "profile": comment.user.profile,
+                        },
+                        "blocked": False,
+                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "content": comment.content,
+                        "reply_count": replies.count(),
+                        "likes_count": comment.likes.count(),
+                        "mine": comment.user == user,
+                        "replies": serialized_replies,
+                    }
+                )
 
         return Response(
             {
