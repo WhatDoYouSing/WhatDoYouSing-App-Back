@@ -214,37 +214,41 @@ class NoteEmotionToggleView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, note_id, emotion_name):
-        user = request.user  # 현재 요청한 사용자
+        user = request.user
         note = get_object_or_404(Notes, id=note_id)
         emotion = get_object_or_404(Emotions, name=emotion_name)
 
-        # 기존 감정이 있는지 확인
-        existing_emotion = NoteEmotion.objects.filter(
-            note=note, user=user, emotion=emotion
-        ).first()
+        # 기존 감정 가져오기
+        existing_emotion = NoteEmotion.objects.filter(note=note, user=user).first()
 
-        if existing_emotion:
-            # 이미 감정이 있으면 삭제 (감정 취소)
+        # 같은 감정을 다시 눌렀을 경우 → 취소
+        if existing_emotion and existing_emotion.emotion == emotion:
             existing_emotion.delete()
             Emotions.objects.filter(id=emotion.id).update(count=F("count") - 1)
             return Response(
                 {"message": f"'{emotion_name}' 감정이 취소되었습니다."},
                 status=status.HTTP_200_OK,
             )
-        else:
-            # 새로운 감정 추가
-            try:
-                NoteEmotion.objects.create(note=note, user=user, emotion=emotion)
-                Emotions.objects.filter(id=emotion.id).update(count=F("count") + 1)
-                return Response(
-                    {"message": f"'{emotion_name}' 감정이 추가되었습니다."},
-                    status=status.HTTP_201_CREATED,
-                )
-            except IntegrityError:
-                return Response(
-                    {"error": "감정 추가 중 오류가 발생했습니다."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+
+        # 다른 감정을 이미 남겼으면 → 그거 삭제
+        if existing_emotion:
+            Emotions.objects.filter(id=existing_emotion.emotion.id).update(count=F("count") - 1)
+            existing_emotion.delete()
+
+        # 새로운 감정 추가
+        try:
+            NoteEmotion.objects.create(note=note, user=user, emotion=emotion)
+            Emotions.objects.filter(id=emotion.id).update(count=F("count") + 1)
+            return Response(
+                {"message": f"'{emotion_name}' 감정이 추가되었습니다."},
+                status=status.HTTP_201_CREATED,
+            )
+        except IntegrityError:
+            return Response(
+                {"error": "감정 추가 중 오류가 발생했습니다."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 
 class SameUserContentsView(APIView):
@@ -313,16 +317,16 @@ class SameSongNoteView(APIView):
             Notes.objects.filter(
                 Q(
                     user=user, song_title=note.song_title, artist=note.artist
-                )  # ✅ 내 노트는 다 포함
+                )  # 내 노트는 다 포함
                 | Q(
                     user__in=friends,
                     visibility="friends",
                     song_title=note.song_title,
                     artist=note.artist,
-                )  # ✅ 친구면 friends 포함
+                )  # 친구면 friends 포함
                 | Q(
                     visibility="public", song_title=note.song_title, artist=note.artist
-                )  # ✅ 일반 사용자는 public만
+                )  # 일반 사용자는 public만
             )
             .exclude(id=note.id)
             .order_by("-created_at")
