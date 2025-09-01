@@ -460,6 +460,10 @@ class NoteCommentListView(BlockFilterMixin, APIView):
         comment_count = NoteComment.objects.filter(note=note).count()
         scrap_count = ScrapNotes.objects.filter(content_id=note_id).count()
 
+        is_collected = ScrapNotes.objects.filter(
+            scrap_list__user=user, content_id=note_id
+        ).exists()
+
         # 부모 댓글 (최상위 댓글) 가져오기
         # comments = NoteComment.objects.filter(note=note).order_by("created_at")
         # 차단한 유저의 댓글 제외
@@ -522,6 +526,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                 "data": {
                     "comment_count": comment_count,
                     "scrap_count": scrap_count,
+                    "is_collected": is_collected,
                     "comments": serialized_comments,
                 },
             },

@@ -281,6 +281,11 @@ class PliCommentListView(BlockFilterMixin, APIView):
         comment_count = PliComment.objects.filter(pli=pli).count()
         scrap_count = ScrapPlaylists.objects.filter(content_id=pli_id).count()
 
+        # 현재 유저가 스크랩했는지 여부
+        is_collected = ScrapPlaylists.objects.filter(
+            scrap_list__user=user, content_id=pli_id
+        ).exists()
+
         # 부모 댓글 (최상위 댓글) 가져오기
         # comments = PliComment.objects.filter(pli=pli).order_by("created_at")
 
@@ -344,6 +349,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                 "data": {
                     "comment_count": comment_count,
                     "scrap_count": scrap_count,
+                    "is_collected": is_collected,
                     "comments": serialized_comments,
                 },
             },
