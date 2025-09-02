@@ -327,6 +327,36 @@ class UserReportSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("신고 사유를 입력해주세요.")
         return value
 
+    # 추가 kwargs(report_user, issue_user)를 받아서 처리
+    def create(self, validated_data, report_user=None, issue_user=None, **kwargs):
+        # defensive copy
+        data = validated_data.copy()
+
+        # validated_data에 클라이언트가 보냈을 수 있는 충돌 키 제거
+        data.pop("report_user", None)
+        data.pop("user", None)  # 모델에서 user라고 쓸 경우 대비
+        data.pop("issue_user", None)
+
+        # report_user / issue_user를 kwargs 또는 context에서 보충
+        if report_user is None:
+            request = self.context.get("request")
+            report_user = getattr(request, "user", None) if request else None
+
+        if issue_user is None:
+            issue_user = self.context.get("issue_user")
+
+        if report_user is None or issue_user is None:
+            raise serializers.ValidationError(
+                "서버 내부 오류: 신고자 또는 대상 정보가 없습니다."
+            )
+
+        # 필요한 필드만 명시적으로 전달해도 안전 (예: reason)
+        return UserReport.objects.create(
+            report_user=report_user,
+            issue_user=issue_user,
+            **data,
+        )
+
 
 # 게시글 신고 시리얼라이저
 class PostReportSerializer(serializers.ModelSerializer):
@@ -339,3 +369,34 @@ class PostReportSerializer(serializers.ModelSerializer):
         if not value.strip():
             raise serializers.ValidationError("신고 사유를 입력해주세요.")
         return value
+
+    # save(report_user=..., issue_user=...) 를 받을 수 있게 처리
+    def create(self, validated_data, report_user=None, issue_user=None, **kwargs):
+        data = validated_data.copy()
+
+        # 클라이언트가 보냈을지 모를 충돌 키 제거
+        data.pop("report_user", None)
+        data.pop("issue_user", None)
+        data.pop("user", None)
+
+        if report_user is None:
+            request = self.context.get("request")
+            report_user = getattr(request, "user", None) if request else None
+
+        if issue_user is None:
+            issue_user = self.context.get("issue_user")
+
+        if report_user is None or issue_user is None:
+            raise serializers.ValidationError(
+                "서버 내부 오류: 신고자/대상 정보가 없습니다."
+            )
+
+        # 자기자신 신고 방지
+        if report_user == issue_user:
+            raise serializers.ValidationError("자신의 게시글은 신고할 수 없습니다.")
+
+        return PostReport.objects.create(
+            report_user=report_user,
+            issue_user=issue_user,
+            **data,
+        )

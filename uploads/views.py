@@ -373,38 +373,46 @@ class PliDelView(views.APIView):
             )
 
 
+MODEL_MAP = {
+    "note": Notes,
+    "pli": Plis,
+}
+
+
 class UserReportView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, post_id):
-        """
-        POST /api/reports/user/{post_id}/
-        {
-          "reason": "신고 사유 텍스트"
-        }
-        """
-        # 1) 게시글 조회 (노트 또는 플리 중 하나)
-        #    필요하다면 두 개 endpoint(노트용/플리용)으로 분리하거나,
-        #    report_type을 추가 파라미터로 받을 수도 있습니다.
-        target = None
-        if Notes.objects.filter(pk=post_id).exists():
-            target = get_object_or_404(Notes, pk=post_id)
-        else:
-            target = get_object_or_404(Plis, pk=post_id)
-
-        # 2) 작성자 본인 여부 확인
-        if target.user != request.user:
+    def post(self, request, post_type, post_id):
+        # 1) post_type 검증 (화이트리스트)
+        Model = MODEL_MAP.get(post_type)
+        if Model is None:
             return Response(
-                {"message": "게시글 작성자만 신고할 수 있습니다."},
+                {"message": "유효하지 않은 post_type 입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2) 대상 객체 조회 (404 처리)
+        target = get_object_or_404(Model, pk=post_id)
+
+        # 3) 작성자 본인 신고 방지
+        if target.user == request.user:
+            return Response(
+                {"message": "본인을 신고할 수 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # 3) 시리얼라이징 및 저장
-        serializer = UserReportSerializer(data=request.data)
+        # 4) 시리얼라이징 및 저장
+        serializer = UserReportSerializer(
+            data=request.data,
+            context={"request": request, "issue_user": target.user},
+        )
         serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data  # reason 등
+
         report = serializer.save(
             report_user=request.user,
             issue_user=target.user,  # = request.user 이긴 하지만, 논리적 흐름상 명시
+            **validated,
         )
 
         return Response(
@@ -437,9 +445,11 @@ class PostReportView(views.APIView):
             "content_id": content_id,
             "reason": request.data.get("reason", ""),
         }
-        serializer = PostReportSerializer(data=data)
+        serializer = PostReportSerializer(
+            data=data, context={"request": request, "issue_user": target.user}
+        )
         serializer.is_valid(raise_exception=True)
-        report = serializer.save(report_user=request.user, issue_user=target.user)
+        report = serializer.save()
 
         return Response(
             {"message": f"{report_type}이(가) 신고되었습니다.", "report_id": report.id},
