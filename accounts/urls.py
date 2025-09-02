@@ -10,6 +10,7 @@ urlpatterns = [
     # ✅ [공통] 유저 정보 관리
     path('update/id/', ChangeServiceIDView.as_view()),  # 아이디 변경
     path('update/pw/', ChangePasswordView.as_view()),  # 비밀번호 변경
+    path('checkpw/', CheckPasswordView.as_view()), # 비밀번호 확인
     path('delete/', UserDeleteView.as_view()),  # 회원 탈퇴
 
     # ✅ [일반] 일반 회원가입 & 로그인
