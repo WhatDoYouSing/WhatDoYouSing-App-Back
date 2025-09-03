@@ -1,21 +1,94 @@
 from rest_framework import serializers
 from .models import Notification, Activity, Device
 from notes.models import *
+from accounts.models import User
+
+
+class MiniUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "nickname", "profile"]
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    actor_nickname = serializers.CharField(source="actor.nickname", read_only=True)
+    actor_user = MiniUserSerializer(source="actor", read_only=True)
+    notif_id = serializers.SerializerMethodField()
+    target_content = serializers.SerializerMethodField()
+    notif_emotion = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
         fields = [
             "id",
-            "actor_nickname",
+            "actor_user",
             "notif_type",
+            "notif_id",
             "content",
+            "target_content",
+            "notif_emotion",
             "is_read",
             "created_at",
         ]
+
+    def get_notif_id(self, obj):
+        # 요청 스키마가 char이므로 문자열로 변환
+        return str(obj.obj_id) if obj.obj_id is not None else None
+
+    # ----- 내부 헬퍼 -----
+    def _get_target_instance(self, obj):
+        # 뷰에서 주입한 target_map 우선 사용 → GFK N+1 방지
+        target_map = self.context.get("target_map", {})
+        if target_map:
+            t = target_map.get((obj.ct_id, obj.obj_id))
+            if t is not None:
+                return t
+        return getattr(obj, "target", None)  # GFK fallback
+
+    def get_target_content(self, obj):
+        t = self._get_target_instance(obj)
+        if t is None:
+            return None
+
+        # --- NoteEmotion인 경우: 원글 노트의 memo를 보여주기 ---
+        if isinstance(t, NoteEmotion):
+            note = getattr(t, "note", None)
+            if note:
+                return (getattr(note, "memo", "") or "")[:200] or None
+
+        # 기존 로직 (댓글/대댓글/노트/플리 처리)
+        if isinstance(t, (NoteComment, PliComment, NoteReply, PliReply)):
+            return (getattr(t, "content", "") or "")[:200] or None
+
+        notif_type = (obj.notif_type or "").lower()
+        if notif_type in {"emotion", "note_save", "pli_save"}:
+            if isinstance(t, Notes):
+                return (getattr(t, "memo", "") or "")[:200] or None
+            # Plis 등 다른 모델 처리(있다면)...
+        # fallback
+        return (getattr(t, "content", "") or "")[:200] or None
+
+    def get_notif_emotion(self, obj):
+        if (obj.notif_type or "").lower() != "emotion":
+            return None
+
+        # 1) target이 NoteEmotion이면 바로 그 emotion.name 반환
+        t = self._get_target_instance(obj)
+        if isinstance(t, NoteEmotion):
+            return getattr(getattr(t, "emotion", None), "name", None)
+
+        # 2) target이 Notes인 경우 (혹시 signals가 Note로 저장한 경우) -> 조회
+        actor_id = getattr(obj, "actor_id", None)
+        note_id = obj.obj_id
+        if actor_id and note_id:
+            return (
+                NoteEmotion.objects.filter(note_id=note_id, user_id=actor_id)
+                .select_related("emotion")
+                .order_by("-created_at")
+                .values_list("emotion__name", flat=True)
+                .first()
+            )
+
+        return None
 
 
 # class ActivitySerializer(serializers.ModelSerializer):

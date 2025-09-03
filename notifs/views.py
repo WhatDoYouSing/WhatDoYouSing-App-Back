@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import views, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.contrib.contenttypes.models import ContentType
 
 from .models import Notification, Activity, Device
 from .serializers import NotificationSerializer, ActivitySerializer, DeviceSerializer
@@ -18,12 +19,50 @@ class NotificationListView(BlockFilterMixin, views.APIView):
     block_model = User
 
     def get(self, request, format=None):
-        qs = Notification.objects.filter(user=request.user)
+        qs = (
+            Notification.objects.filter(user=request.user)
+            .select_related("actor")
+            .order_by("-created_at")
+        )
         # actor 기준으로 필터
-        qs = self.filter_blocked(qs.filter(actor__isnull=False))
+        # 2) 차단한 사용자 알림만 제외 (actor가 없는 시스템 알림은 유지)
+        blocked = set(blocked_user_ids(request.user))
 
-        data = NotificationSerializer(qs, many=True).data
-        return Response(data)
+        if blocked:
+            qs = qs.exclude(actor_id__in=blocked)
+
+        # 3) target_map 미리 구성해서 GenericFK N+1 제거
+        ct_obj_ids = {}
+        for n in qs:
+            if n.ct_id and n.obj_id:
+                ct_obj_ids.setdefault(n.ct_id, set()).add(n.obj_id)
+
+        target_map = {}
+        if ct_obj_ids:
+            for ct_id, obj_ids in ct_obj_ids.items():
+                try:
+                    ct = ContentType.objects.get_for_id(ct_id)
+                except ContentType.DoesNotExist:
+                    continue
+                model = ct.model_class()
+                if model is None:
+                    continue
+
+                # Notes/Plis는 작성자도 필요하므로 select_related("user")
+                if model is Notes:
+                    objs = Notes.objects.filter(id__in=obj_ids).select_related("user")
+                elif model is Plis:
+                    objs = Plis.objects.filter(id__in=obj_ids).select_related("user")
+                else:
+                    objs = model.objects.filter(id__in=obj_ids)
+
+                for o in objs:
+                    target_map[(ct_id, o.id)] = o
+
+        serializer = NotificationSerializer(
+            qs, many=True, context={"target_map": target_map}
+        )
+        return Response(serializer.data)
 
 
 class NotificationMarkReadView(views.APIView):
@@ -35,9 +74,6 @@ class NotificationMarkReadView(views.APIView):
             user=request.user, id__in=ids, is_read=False
         ).update(is_read=True, read_at=timezone.now())
         return Response({"marked": updated})
-
-
-from django.contrib.contenttypes.models import ContentType
 
 
 class ActivityListView(BlockFilterMixin, views.APIView):
@@ -103,7 +139,7 @@ class DeviceRegisterView(views.APIView):
         token = serializer.validated_data["expo_token"]
 
         Device.objects.update_or_create(
-            user=request.user, defaults={"expo_token": token}
+            expo_token=token, defaults={"user": request.user}
         )
         return Response(
             {"message": "Expo 토큰 등록 완료"}, status=status.HTTP_201_CREATED
