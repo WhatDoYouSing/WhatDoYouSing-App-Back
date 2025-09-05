@@ -109,6 +109,7 @@ class Activity(models.Model):
     obj_id = models.PositiveIntegerField(null=True)
     target = GenericForeignKey("ct", "obj_id")
     created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False, verbose_name="읽음 여부")
 
     class Meta:
         ordering = ["-created_at"]
