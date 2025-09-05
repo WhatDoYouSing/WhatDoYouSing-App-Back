@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import views, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -80,27 +81,21 @@ class ActivityListView(BlockFilterMixin, views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        """qs = Activity.objects.filter(user=request.user)
-        data = ActivitySerializer(qs, many=True).data
-        return Response(data)"""
         user = request.user
-        qs = Activity.objects.filter(user=user)
+        qs = Activity.objects.filter(user=user).select_related(
+            "user"
+        )  # user는 미리 가져오기
 
-        # target 모델 중 user 필드가 있는 경우에만 필터링
-        blocked_users = set(blocked_user_ids(user))
-        filtered_qs = []
-        for act in qs:
-            target = act.target
-            owner = getattr(target, "user", None)
-            if not owner or owner.id not in blocked_users:
-                filtered_qs.append(act)
-        # --- bulk로 target들 미리 조회해서 매핑 만들기 (ContentType, obj_id 기반) ---
-        # ct_id -> set(obj_ids)
+        # 1) ct_id/obj_id를 미리 수집(여기선 GenericFK 접근 X)
         ct_obj_ids = {}
-        for act in filtered_qs:
+        acts = list(
+            qs
+        )  # materialize queryset (페이징이 필요하면 페이지 단위로 바꿀 것)
+        for act in acts:
             if act.ct_id and act.obj_id:
                 ct_obj_ids.setdefault(act.ct_id, set()).add(act.obj_id)
 
+        # 2) bulk로 대상들 미리 조회해서 매핑 만들기
         target_map = {}
         if ct_obj_ids:
             for ct_id, obj_ids in ct_obj_ids.items():
@@ -123,11 +118,65 @@ class ActivityListView(BlockFilterMixin, views.APIView):
                 for o in objs:
                     target_map[(ct_id, o.id)] = o
 
-        serializer = ActivitySerializer(
-            filtered_qs, many=True, context={"target_map": target_map}
-        )
+        # 3) 차단된 타겟 소유자 필터링 (target_map 사용, GenericFK 접근 X)
+        blocked_users = set(blocked_user_ids(user))
+        filtered_acts = []
+        for act in acts:
+            # 활동에 target이 없을 수 있음 (예: achievement 등) -> 통과
+            if not act.ct_id or not act.obj_id:
+                filtered_acts.append(act)
+                continue
 
+            target = target_map.get((act.ct_id, act.obj_id))
+            owner = getattr(target, "user", None)
+            # owner가 없거나 owner가 차단 목록에 없으면 포함
+            if not owner or owner.id not in blocked_users:
+                filtered_acts.append(act)
+
+        # 4) serializer에 target_map 전달 (성능 최적화)
+        serializer = ActivitySerializer(
+            filtered_acts, many=True, context={"target_map": target_map}
+        )
         return Response(serializer.data)
+
+
+class ActivityMarkReadView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        ids = request.data.get("ids", [])
+
+        # 간단한 입력 유효성 검사
+        if isinstance(ids, str):
+            try:
+                ids = [int(x) for x in ids.split(",") if x.strip()]
+            except ValueError:
+                return Response(
+                    {"detail": "ids must be list of integers"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if not isinstance(ids, (list, tuple)):
+            return Response(
+                {"detail": "ids must be a list"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "ids must contain integers only"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not ids:
+            return Response({"marked": 0})
+
+        with transaction.atomic():
+            qs = Activity.objects.filter(user=request.user, id__in=ids, is_read=False)
+            updated = qs.update(is_read=True)
+
+        return Response({"marked": updated})
 
 
 class DeviceRegisterView(views.APIView):

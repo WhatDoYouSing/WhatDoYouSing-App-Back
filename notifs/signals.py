@@ -217,7 +217,7 @@ Pli = apps.get_model("notes", "Plis")
 
 @receiver(post_save, sender=ScrapNotes)
 def on_note_scrap(sender, instance, created, **kwargs):
-    if not created:
+    """if not created:
         return
     saver = instance.scrap_list.user
     try:
@@ -237,7 +237,101 @@ def on_note_scrap(sender, instance, created, **kwargs):
         message=f"{saver.nickname} 님이 내 노트를 스크랩했습니다.",
         obj=note_obj,
     )
-    # 스크랩은 활동 탭에 기록하지 않음.
+    # 스크랩은 활동 탭에 기록하지 않음."""
+    if not created:
+        return
+
+    try:
+        # 1) saver (스크랩한 사람)
+        saver = None
+        try:
+            scrap_list = getattr(instance, "scrap_list", None)
+            saver = (
+                getattr(scrap_list, "user", None) if scrap_list is not None else None
+            )
+        except Exception as e:
+            logger.exception(
+                "on_note_scrap: failed to read scrap_list.user for ScrapNotes id=%s: %s",
+                getattr(instance, "id", None),
+                e,
+            )
+            saver = None
+
+        if saver is None:
+            logger.warning(
+                "on_note_scrap: saver not found for ScrapNotes id=%s; skipping",
+                getattr(instance, "id", None),
+            )
+            return
+
+        # 2) note 객체: content_id 필드가 모델에서 정의되어 있으니 이걸 사용
+        note_id = getattr(instance, "content_id", None)
+        if not note_id:
+            logger.warning(
+                "on_note_scrap: no content_id on ScrapNotes id=%s; fields: %s",
+                getattr(instance, "id", None),
+                {
+                    f.name: getattr(instance, f.name, None)
+                    for f in instance._meta.fields
+                },
+            )
+            return
+
+        try:
+            note_obj = Note.objects.get(pk=note_id)
+        except Note.DoesNotExist:
+            logger.warning(
+                "on_note_scrap: Note does not exist for content_id=%s (ScrapNotes id=%s)",
+                note_id,
+                getattr(instance, "id", None),
+            )
+            return
+
+        owner = getattr(note_obj, "user", None)
+        if owner is None:
+            logger.warning("on_note_scrap: note owner missing for note_id=%s", note_id)
+            return
+
+        # 3) 자기 스크랩이면 알림 안보냄
+        if saver.id == owner.id:
+            return
+
+        # 4) 차단 검사 (유저/콘텐츠 단위)
+        if _is_blocked_by(owner, saver, obj=note_obj):
+            logger.debug(
+                "on_note_scrap: blocked -> skipping notification (note_id=%s saver_id=%s owner_id=%s)",
+                note_id,
+                saver.id,
+                owner.id,
+            )
+            return
+
+        # 5) 알림 생성 (obj로 Notes 인스턴스 연결)
+        display_name = (
+            getattr(saver, "nickname", None)
+            or getattr(saver, "username", None)
+            or "사용자"
+        )
+        try:
+            _push_and_record(
+                target=owner,
+                actor=saver,
+                notif_type="note_save",
+                message=f"{display_name} 님이 내 노트를 스크랩했습니다.",
+                obj=note_obj,
+            )
+        except Exception:
+            logger.exception(
+                "on_note_scrap: failed to _push_and_record for note_id=%s saver_id=%s",
+                note_id,
+                saver.id,
+            )
+
+    except Exception:
+        logger.exception(
+            "on_note_scrap: unexpected error for ScrapNotes id=%s",
+            getattr(instance, "id", None),
+        )
 
 
 @receiver(post_save, sender=ScrapPlaylists)
@@ -393,7 +487,8 @@ def on_note_comment(sender, instance, created, **kwargs):
                 actor=actor,
                 notif_type="comment",
                 message=f"{actor.nickname} 님이 내 노트에 댓글을 달았습니다.",
-                obj=instance,  # 원글(노트)을 obj로 연결 -> 프론트에서 원글로 이동하기 편함
+                # obj=instance,  # 원글(노트)을 obj로 연결 -> 프론트에서 원글로 이동하기 편함
+                obj=note_obj,
             )
 
     # 활동 기록은 항상 남김 (사용자 행위 이력)
@@ -422,7 +517,8 @@ def on_pli_comment(sender, instance, created, **kwargs):
                 actor=actor,
                 notif_type="comment",
                 message=f"{actor.nickname} 님이 내 플리에 댓글을 달았습니다.",
-                obj=instance,
+                # obj=instance,
+                obj=pli_obj,
             )
 
     _record_activity(user=actor, act_type="comment_pli", obj=instance)
