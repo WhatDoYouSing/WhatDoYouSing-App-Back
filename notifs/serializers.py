@@ -176,6 +176,7 @@ class MiniTitleSerializer(serializers.ModelSerializer):
 class ActivitySerializer(serializers.ModelSerializer):
     target_user = serializers.SerializerMethodField()
     activity_id = serializers.SerializerMethodField()
+    parent_type = serializers.SerializerMethodField()
     content = serializers.SerializerMethodField()
     activity_content = serializers.SerializerMethodField()
     activity_emotion = serializers.SerializerMethodField()
@@ -188,6 +189,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             "target_user",
             "activity_type",
             "activity_id",
+            "parent_type",
             "content",
             "activity_content",
             "activity_emotion",
@@ -278,6 +280,46 @@ class ActivitySerializer(serializers.ModelSerializer):
                 owner = maybe
 
         return MiniUserSerializer(owner).data if owner else None
+
+    # ---------------- parent_type ----------------
+    def get_parent_type(self, obj):
+        """
+        상위 컨테이너가 노트인지 플리인지 반환: "note" | "pli" | None
+        - comment_*/reply_*: t.note or t.pli 또는 t.comment.note/pli를 따라 올라감
+        - like_comment/like_reply: 대상 댓글/대댓글에서 부모를 따라 올라감
+        - emotion: t.note → "note"
+        - 그 외: t가 직접 원글(Notes/Plis)이면 그에 맞게 판단
+        """
+        a = (obj.activity_type or "").lower()
+        if a == "achievement":
+            return None  # ← 명시적으로 null
+        t = self._get_target_instance(obj)
+        if not t:
+            return None
+
+        # 1) 직접 원글일 수 있음 (Notes/Plis)
+        if hasattr(t, "song_title") or t.__class__.__name__ == "Notes":
+            return "note"
+        if hasattr(t, "title") or t.__class__.__name__ == "Plis":
+            return "pli"
+
+        # 2) NoteEmotion: note가 부모
+        if hasattr(t, "note") and getattr(t, "note", None) is not None:
+            return "note"
+
+        # 3) Comment: note/pli 중 하나를 부모로 가짐
+        if hasattr(t, "pli") and getattr(t, "pli", None) is not None:
+            return "pli"
+
+        # 4) Reply: comment를 통해 note/pli로 올라감
+        c = getattr(t, "comment", None)
+        if c is not None:
+            if hasattr(c, "note") and getattr(c, "note", None) is not None:
+                return "note"
+            if hasattr(c, "pli") and getattr(c, "pli", None) is not None:
+                return "pli"
+
+        return None
 
     # ---------------- 이하 기존 필드들 (activity_id, content, activity_content, activity_emotion, activity_achievement) ----------------
     def get_activity_id(self, obj):
