@@ -209,16 +209,19 @@ class ConsentView(views.APIView):
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
         return Response({'error': serializer.errors}, status=400)
 
-# ✅ [일반] 이메일 인증 요청 (최종)
+# ✅ [일반] 이메일 인증 요청
 class RequestEmailVerificationView(views.APIView):
     def post(self, request):
         email = request.data.get("email")
         if not email:
             return Response({"error": "이메일은 필수입니다."}, status=400)
 
-        # 이미 존재하는 유저가 있다면 거부해도 됨
+        # 이미 가입된 이메일 거부
         if User.objects.filter(email=email).exists():
             return Response({"error": "이미 가입된 이메일입니다."}, status=400)
+
+        # VerifyEmail 객체 생성 or 조회
+        verify_obj, created = VerifyEmail.objects.get_or_create(email=email)
 
         # 토큰 생성
         token = EmailVerificationTokenGenerator().make_token(email)
@@ -236,7 +239,7 @@ class RequestEmailVerificationView(views.APIView):
 
         email_message = EmailMultiAlternatives(
             subject=subject,
-            body="HTML 지원되지 않는 클라이언트를 위한 텍스트 버전입니다.",  # fallback
+            body="HTML 지원되지 않는 클라이언트를 위한 텍스트 버전입니다.",
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[email],
         )
@@ -245,8 +248,7 @@ class RequestEmailVerificationView(views.APIView):
 
         return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
 
-'''
-# ✅ [일반] 이메일 인증
+# 📌 [일반] 이메일 인증 처리
 class VerifyEmailView(views.APIView):
     def get(self, request, uidb64, token):
         try:
@@ -254,41 +256,18 @@ class VerifyEmailView(views.APIView):
         except (ValueError, TypeError, OverflowError):
             return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 토큰 확인
-        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
-        if not token_valid:
+        if not EmailVerificationTokenGenerator().check_token(email, token):
             return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        #return Response({
-        #    'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
-        #    'email': email
-        #}, status=status.HTTP_200_OK)
-        return render(
-            request,
-            "email_verified.html",
-            {"email": email},
-            content_type="text/html"
-        )
-'''
-
-# 📌 [일반] 이메일 인증 수정중...
-class VerifyEmailView(views.APIView):
-    def get(self, request, uidb64, token):
-        try:
-            email = force_str(urlsafe_base64_decode(uidb64))
-        except (ValueError, TypeError, OverflowError):
-            return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
-        if not token_valid:
-            return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
-
+        # 인증 상태 업데이트
         verify_obj, _ = VerifyEmail.objects.get_or_create(email=email)
         verify_obj.is_verified = True
         verify_obj.save()
 
+        # 앱으로 이동
         return redirect(f"whatdoyousing://auth/signup?cur_step=3&verified_email={email}")
     
+# ✅ [일반] 이메일 인증 여부 확인
 class CheckEmailVerificationView(views.APIView):
     def get(self, request):
         email = request.query_params.get("email")
@@ -297,9 +276,10 @@ class CheckEmailVerificationView(views.APIView):
 
         try:
             verify_obj = VerifyEmail.objects.get(email=email)
-            return Response({"is_verified": verify_obj.is_verified}, status=status.HTTP_200_OK)
         except VerifyEmail.DoesNotExist:
             return Response({"error": "인증 요청이 존재하지 않습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({"is_verified": verify_obj.is_verified}, status=status.HTTP_200_OK)
 
 
 # ✅ [일반] 회원가입
