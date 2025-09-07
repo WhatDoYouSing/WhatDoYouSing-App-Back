@@ -166,34 +166,29 @@ class ChangePasswordView(views.APIView):
 class UserDeleteView(views.APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        user = request.user
-        auth_provider = user.auth_provider
-        return Response({"user type":auth_provider})
-
     def post(self, request):
         serializer = UserDeleteSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         user = request.user
         auth_provider = user.auth_provider 
-        reason = serializer.validated_data["reason"]
+        reason_codes = serializer.validated_data["reason"]  # 리스트 형태
         custom_reason = serializer.validated_data.get("custom_reason", "")
-
-        if auth_provider == "email":
-            password = serializer.validated_data["password"]
-            if not user.check_password(password):
-                return Response({"message": "비밀번호가 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
         user_deletion = UserDeletion.objects.create(
             user=user,
-            reason=reason,
-            custom_reason=custom_reason if reason == 7 else "",
+            custom_reason=custom_reason,
             deleted_at=now()
         )
 
+        reasons = WithdrawalReason.objects.filter(code__in=reason_codes)
+        user_deletion.reason.set(reasons) 
+
         user_deletion.user = None
         user_deletion.save()
+
+        if auth_provider == "email":
+            VerifyEmail.objects.filter(email=user.email).delete()
 
         user.delete()
 
