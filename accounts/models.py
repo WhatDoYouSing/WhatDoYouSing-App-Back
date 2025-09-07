@@ -109,7 +109,8 @@ class UserDeletion(models.Model):
 
     def __str__(self):
         user_str = self.user.username if self.user else "탈퇴한 유저"
-        return f"{user_str} (사유: {self.reason})"
+        reasons = ", ".join([str(r) for r in self.reason.all()])
+        return f"{user_str} (사유: {reasons})"
 
 class UserTitle(models.Model):
     user = models.ForeignKey(
