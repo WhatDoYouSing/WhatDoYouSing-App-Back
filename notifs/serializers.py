@@ -17,6 +17,8 @@ class NotificationSerializer(serializers.ModelSerializer):
     target_content = serializers.SerializerMethodField()
     notif_emotion = serializers.SerializerMethodField()
     content = serializers.SerializerMethodField()
+    parent_type = serializers.SerializerMethodField()
+    parent_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -25,6 +27,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "actor_user",
             "notif_type",
             "notif_id",
+            "parent_type",
+            "parent_id",
             "content",
             "target_content",
             "notif_emotion",
@@ -32,19 +36,69 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    # NotificationSerializer 클래스 내부에 추가
+    def _normalized_notif_type(self, obj):
+        nt = (obj.notif_type or "").lower()
+        if nt != "like":
+            return nt
+
+        # obj.notif_type == "like" 인 경우: target 인스턴스로 판별
+        t = self._get_target_instance(obj)
+        # reply 인스턴스는 보통 부모 comment 참조(.comment) 를 가짐 -> like_reply
+        try:
+            if t is not None:
+                # reply 객체인지(부모 comment 속성 존재 & comment가 비어있지 않음)
+                if hasattr(t, "comment") and getattr(t, "comment", None) is not None:
+                    return "like_reply"
+                # reply는 아니면 기본적으로 comment 좋아요로 간주
+                return "like_comment"
+        except Exception:
+            pass
+
+        # 마지막 보루: ContentType 기반 추론
+        try:
+            if getattr(obj, "ct_id", None):
+                model_name = ContentType.objects.get_for_id(obj.ct_id).model
+                if model_name and "reply" in model_name:
+                    return "like_reply"
+        except Exception:
+            pass
+
+        return "like_comment"
+
     def get_content(self, obj):
+        # actor에서 표시할 이름 추출 (닉네임 우선, 없으면 username, 없으면 "사용자")
         actor = getattr(obj, "actor", None)
-        name = (
+        actor_name = (
             getattr(actor, "nickname", None)
             or getattr(actor, "username", None)
             or "사용자"
         )
-        nt = (obj.notif_type or "").lower()
+        nt = self._normalized_notif_type(obj)
+
+        # 명시된 템플릿 매핑
+        if nt == "follow":
+            return f"{actor_name}님이 나를 팔로우했어요."
         if nt == "note_save":
-            return f"{name} 님이 내 노트를 스크랩했습니다."
+            return f"{actor_name}님이 내 노트를 저장했어요."
         if nt == "pli_save":
-            return f"{name} 님이 내 플리를 스크랩했습니다."
-        # 기타 타입 처리...
+            return f"{actor_name}님이 내 플리를 저장했어요."
+        if nt == "emotion":
+            return f"{actor_name}님이 내 노트에 감정을 남겼어요."
+        if nt == "comment":
+            return f"{actor_name}님이 댓글을 남겼어요."
+        if nt == "reply":
+            return f"{actor_name}님이 대댓글을 남겼어요."
+
+        # 좋아요 처리: 기존 DB가 'like'만 사용하는 경우와, 'like_reply' 같이 분리한 경우 모두 대응
+        if nt == "like_comment":
+            # 기본(기존) : 댓글에 좋아요로 보여주기
+            return f"{actor_name}님이 댓글에 좋아요를 남겼어요."
+        if nt in ("like_reply", "like (미정)"):
+            # 명시적으로 대댓글 좋아요 타입이 들어온 경우
+            return f"{actor_name}님이 대댓글에 좋아요를 남겼어요."
+
+        # fallback: 기존 content 필드를 그대로 사용하거나 빈 문자열 반환
         return obj.content or ""
 
     def get_notif_id(self, obj):
@@ -165,6 +219,76 @@ class NotificationSerializer(serializers.ModelSerializer):
             return None
 
         return None
+
+    def _resolve_parent_post_from_target(self, target):
+        """
+        target 인스턴스에서 원글(Notes/Plis)의 타입과 id를 찾아 반환.
+        반환: (parent_type, parent_id) where parent_type in ('note', 'pli') or (None, None)
+        """
+        if target is None:
+            return None, None
+
+        # 1) target 자체가 Notes / Plis
+        if Notes is not None and isinstance(target, Notes):
+            return "note", getattr(target, "id", None)
+        if Plis is not None and isinstance(target, Plis):
+            return "pli", getattr(target, "id", None)
+
+        # 2) NoteEmotion -> target.note
+        if hasattr(target, "note"):
+            note = getattr(target, "note", None)
+            if note:
+                return "note", getattr(note, "id", None)
+
+        # 3) NoteComment -> .note, PliComment -> .pli
+        # 4) NoteReply -> .comment.note, PliReply -> .comment.pli
+        # 5) 일반 댓글/대댓글(타입 판별용): .comment 속성 유무로 reply인지 판단 가능
+        # NoteComment / NoteReply
+        if NoteComment is not None and isinstance(target, NoteComment):
+            note = getattr(target, "note", None)
+            if note:
+                return "note", getattr(note, "id", None)
+        if NoteReply is not None and isinstance(target, NoteReply):
+            parent_comment = getattr(target, "comment", None)
+            if parent_comment:
+                note = getattr(parent_comment, "note", None)
+                if note:
+                    return "note", getattr(note, "id", None)
+
+        # PliComment / PliReply
+        if PliComment is not None and isinstance(target, PliComment):
+            pli = getattr(target, "pli", None)
+            if pli:
+                return "pli", getattr(pli, "id", None)
+        if PliReply is not None and isinstance(target, PliReply):
+            parent_comment = getattr(target, "comment", None)
+            if parent_comment:
+                pli = getattr(parent_comment, "pli", None)
+                if pli:
+                    return "pli", getattr(pli, "id", None)
+
+        # 6) 일반 속성 기반 fallback
+        if hasattr(target, "note"):
+            n = getattr(target, "note", None)
+            if n:
+                return "note", getattr(n, "id", None)
+        if hasattr(target, "pli"):
+            p = getattr(target, "pli", None)
+            if p:
+                return "pli", getattr(p, "id", None)
+
+        # 마지막으로 target에 user와 연결된 parent가 없다면 None
+        return None, None
+
+    def get_parent_type(self, obj):
+        t = self._get_target_instance(obj)
+        pt, _ = self._resolve_parent_post_from_target(t)
+        return pt
+
+    def get_parent_id(self, obj):
+        t = self._get_target_instance(obj)
+        _, pid = self._resolve_parent_post_from_target(t)
+        return pid
 
 
 class MiniTitleSerializer(serializers.ModelSerializer):

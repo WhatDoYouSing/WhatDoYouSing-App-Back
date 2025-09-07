@@ -736,29 +736,36 @@ def _handle_like(sender, instance, action, pk_set, **kwargs):
 
     owner = instance.user  # 댓글/대댓글 작성자
     is_reply = hasattr(instance, "comment")  # Reply 는 comment 속성 보유
-    like_type = "like_reply" if is_reply else "like_comment"
 
     for liker_id in pk_set:
         if liker_id == owner.id:
-            continue  # 자기 글 좋아요면 알림 X
+            continue
 
         try:
             liker = User.objects.get(pk=liker_id)
         except User.DoesNotExist:
             continue
 
-        # 차단 검사: 수신자(owner)가 liker 를 차단했거나 해당 콘텐츠를 차단했으면 스킵
         if _is_blocked_by(owner, liker, obj=instance):
             continue
+
+        # 분기: notif_type을 댓글/대댓글로 분리
+        notif_type = "like_reply" if is_reply else "like_comment"
+        message = (
+            f"{liker.nickname} 님이 내 대댓글에 좋아요를 남겼습니다."
+            if is_reply
+            else f"{liker.nickname} 님이 내 댓글에 좋아요를 남겼습니다."
+        )
 
         _push_and_record(
             target=owner,
             actor=liker,
-            notif_type="like",
-            message=f"{liker.nickname} 님이 내 댓글/대댓글을 좋아요를 남겼어요.",
+            notif_type=notif_type,
+            message=message,
             obj=instance,
         )
-        _record_activity(user=liker, act_type=like_type, obj=instance)
+        # 활동 기록은 기존처럼 act_type에 따라 남김
+        _record_activity(user=liker, act_type=notif_type, obj=instance)
 
 
 # NoteComment.likes

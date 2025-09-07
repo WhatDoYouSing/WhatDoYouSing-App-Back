@@ -50,7 +50,8 @@ class Notification(models.Model):
         ("emotion", "내 노트 감정"),
         ("comment", "댓글"),
         ("reply", "대댓글"),
-        ("like", "댓글 좋아요"),
+        ("like_comment", "댓글 좋아요"),
+        ("like_reply", "대댓글 좋아요"),
     ]
 
     user = models.ForeignKey(
