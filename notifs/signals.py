@@ -148,7 +148,16 @@ def _resolve_users_by_mention_string(mention_value):
 # 공통 헬퍼
 # ────────────────────────────────────────────────────────────────
 def _push_and_record(*, target, actor, notif_type, message, obj):
-    """Notification 레코드 생성 + Expo Push 발송"""
+    """
+    Notification 레코드 생성 + transaction.on_commit에서
+    NotificationSerializer로 content 생성 -> DB 업데이트 -> Expo Push 발송
+
+    - target: 수신자(User 인스턴스)
+    - actor: 행동 주체(User 인스턴스) or None
+    - notif_type: Notification.notif_type 값 (예: 'comment', 'emotion' 등)
+    - message: 기본/임시 메세지(선택)
+    - obj: 관련 객체 (Notes, NoteComment, NoteReply, NoteEmotion, Plis 등)
+    """
     notif = Notification.objects.create(
         user=target,
         actor=actor,
@@ -160,13 +169,37 @@ def _push_and_record(*, target, actor, notif_type, message, obj):
 
     def _do_push():
         try:
+            # lazy import: serializer 내부에서 signals를 import하면 순환참조가 날 수 있으므로 여기서 import
+            from notifs.serializers import NotificationSerializer
+
+            # re-fetch to ensure GenericFK etc. working
+            notif.refresh_from_db()
+
+            # serializer로 직렬화 (프론트에 보여줄 형태)
+            serialized = NotificationSerializer(notif, context={}).data
+
+            # serializer가 만든 content 우선 사용
+            serialized_content = (
+                serialized.get("content") if isinstance(serialized, dict) else None
+            )
+            final_message = serialized_content or message or (notif.content or "")
+
+            # DB의 content 필드와 일치시키기 (변경된 경우에만 update)
+            if final_message and final_message != (notif.content or ""):
+                Notification.objects.filter(pk=notif.pk).update(content=final_message)
+
+            # Expo 토큰 검색 및 푸시
             tokens = list(
                 Device.objects.filter(user=target).values_list("expo_token", flat=True)
             )
             if tokens:
-                send_expo_push(tokens, "새 알림", message, {"notif_id": notif.id})
+                send_expo_push(tokens, "새 알림", final_message, {"notif_id": notif.id})
+
         except Exception:
-            logger.exception("send_expo_push 실패 for notif_id=%s", notif.id)
+            logger.exception(
+                "send_expo_push/notification-serialize 실패 for notif_id=%s",
+                getattr(notif, "id", None),
+            )
 
     transaction.on_commit(_do_push)
     return notif
@@ -317,7 +350,7 @@ def on_note_scrap(sender, instance, created, **kwargs):
                 target=owner,
                 actor=saver,
                 notif_type="note_save",
-                message=f"{display_name} 님이 내 노트를 스크랩했습니다.",
+                message=f"{display_name} 님이 내 노트를 저장했어요.",
                 obj=note_obj,
             )
         except Exception:
@@ -354,7 +387,7 @@ def on_pli_scrap(sender, instance, created, **kwargs):
         target=owner,
         actor=saver,
         notif_type="pli_save",
-        message=f"{saver.nickname} 님이 내 플리를 스크랩했습니다.",
+        message=f"{saver.nickname} 님이 내 플리를 저장했어요.",
         obj=pli_obj,
     )
 
@@ -383,7 +416,7 @@ def on_emotion(sender, instance, created, **kwargs):
         target=owner,
         actor=actor,
         notif_type="emotion",
-        message=f"{actor.nickname} 님이 내 노트에 감정을 남겼습니다.",
+        message=f"{actor.nickname} 님이 내 노트에 감정을 남겼어요.",
         obj=note_obj,
     )
     _record_activity(user=actor, act_type="emotion", obj=instance)
@@ -486,7 +519,7 @@ def on_note_comment(sender, instance, created, **kwargs):
                 target=owner,
                 actor=actor,
                 notif_type="comment",
-                message=f"{actor.nickname} 님이 내 노트에 댓글을 달았습니다.",
+                message=f"{actor.nickname} 님이 댓글을 남겼어요.",
                 # obj=instance,  # 원글(노트)을 obj로 연결 -> 프론트에서 원글로 이동하기 편함
                 obj=note_obj,
             )
@@ -516,7 +549,7 @@ def on_pli_comment(sender, instance, created, **kwargs):
                 target=owner,
                 actor=actor,
                 notif_type="comment",
-                message=f"{actor.nickname} 님이 내 플리에 댓글을 달았습니다.",
+                message=f"{actor.nickname} 님이 댓글을 남겼어요.",
                 # obj=instance,
                 obj=pli_obj,
             )
@@ -703,29 +736,36 @@ def _handle_like(sender, instance, action, pk_set, **kwargs):
 
     owner = instance.user  # 댓글/대댓글 작성자
     is_reply = hasattr(instance, "comment")  # Reply 는 comment 속성 보유
-    like_type = "like_reply" if is_reply else "like_comment"
 
     for liker_id in pk_set:
         if liker_id == owner.id:
-            continue  # 자기 글 좋아요면 알림 X
+            continue
 
         try:
             liker = User.objects.get(pk=liker_id)
         except User.DoesNotExist:
             continue
 
-        # 차단 검사: 수신자(owner)가 liker 를 차단했거나 해당 콘텐츠를 차단했으면 스킵
         if _is_blocked_by(owner, liker, obj=instance):
             continue
+
+        # 분기: notif_type을 댓글/대댓글로 분리
+        notif_type = "like_reply" if is_reply else "like_comment"
+        message = (
+            f"{liker.nickname} 님이 내 대댓글에 좋아요를 남겼습니다."
+            if is_reply
+            else f"{liker.nickname} 님이 내 댓글에 좋아요를 남겼습니다."
+        )
 
         _push_and_record(
             target=owner,
             actor=liker,
-            notif_type="like",
-            message=f"{liker.nickname} 님이 내 댓글/대댓글을 좋아했습니다.",
+            notif_type=notif_type,
+            message=message,
             obj=instance,
         )
-        _record_activity(user=liker, act_type=like_type, obj=instance)
+        # 활동 기록은 기존처럼 act_type에 따라 남김
+        _record_activity(user=liker, act_type=notif_type, obj=instance)
 
 
 # NoteComment.likes
