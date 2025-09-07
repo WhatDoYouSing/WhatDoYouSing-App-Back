@@ -126,3 +126,7 @@ class UserTitle(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.title.name}"  # 유저와 칭호 이름 표시
+    
+class VerifyEmail(models.Model):
+    email = models.EmailField(unique=True)
+    is_verified = models.BooleanField(default=False)

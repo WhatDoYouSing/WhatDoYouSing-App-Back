@@ -157,7 +157,7 @@ class GeneralSignUpSerializer(AbstractSignupSerializer):
             push_notification_consent=validated_data.get('push_notification_consent', False),
             marketing_consent=validated_data.get('marketing_consent', False)
         )
-        user.is_active=False
+        user.is_active=True
         user.set_password(validated_data['password'])  # 비밀번호 해싱
         user.save()
         return user

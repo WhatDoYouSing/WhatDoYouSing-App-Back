@@ -127,6 +127,10 @@ class CheckPasswordView(views.APIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user = request.user
+
+            if user.auth_provider != "email":
+                return Response({'message': '소셜 회원은 비밀번호를 변경할 수 없습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+            
             current_password = serializer.validated_data["current_password"]
 
             if not user.check_password(current_password):
@@ -136,7 +140,7 @@ class CheckPasswordView(views.APIView):
 
         return Response({'message': '입력값 오류', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
     
-# 📌 [공통] 비밀번호 변경
+# ✅ [공통] 비밀번호 변경
 class ChangePasswordView(views.APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PasswordUpdateSerializer
@@ -240,7 +244,8 @@ class RequestEmailVerificationView(views.APIView):
         email_message.send()
 
         return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
-    
+
+'''
 # ✅ [일반] 이메일 인증
 class VerifyEmailView(views.APIView):
     def get(self, request, uidb64, token):
@@ -264,16 +269,46 @@ class VerifyEmailView(views.APIView):
             {"email": email},
             content_type="text/html"
         )
+'''
+
+# 📌 [일반] 이메일 인증 수정중...
+class VerifyEmailView(views.APIView):
+    def get(self, request, uidb64, token):
+        try:
+            email = force_str(urlsafe_base64_decode(uidb64))
+        except (ValueError, TypeError, OverflowError):
+            return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
+        if not token_valid:
+            return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        verify_obj, _ = VerifyEmail.objects.get_or_create(email=email)
+        verify_obj.is_verified = True
+        verify_obj.save()
+
+        return redirect(f"whatdoyousing://auth/signup?cur_step=3&verified_email={email}")
+    
+class CheckEmailVerificationView(views.APIView):
+    def get(self, request):
+        email = request.query_params.get("email")
+        if not email:
+            return Response({"error": "이메일은 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            verify_obj = VerifyEmail.objects.get(email=email)
+            return Response({"is_verified": verify_obj.is_verified}, status=status.HTTP_200_OK)
+        except VerifyEmail.DoesNotExist:
+            return Response({"error": "인증 요청이 존재하지 않습니다."}, status=status.HTTP_404_NOT_FOUND)
+
 
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
     permission_classes = [AllowAny]
     serializer_class = GeneralSignUpSerializer
 
-    # 이메일 인증 미완료 시 가입 못하도록? 가능한가..? 이메일 인증 시 유저 객체 생성을 안해가지고 흠.. 뭐 email_is_verified 이런걸 만들어서
-    # 근데 그걸 만들어도 .. 유저 객체가 만들어지는게 아니잖아.. 그럼 이메일 테이블을 아예 따로 만들어야? (분리해야?)
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data) 
 
         if serializer.is_valid():
             user = serializer.save()
