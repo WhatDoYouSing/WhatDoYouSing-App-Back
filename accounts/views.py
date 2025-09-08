@@ -127,6 +127,10 @@ class CheckPasswordView(views.APIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user = request.user
+
+            if user.auth_provider != "email":
+                return Response({'message': '소셜 회원은 비밀번호를 변경할 수 없습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+            
             current_password = serializer.validated_data["current_password"]
 
             if not user.check_password(current_password):
@@ -136,7 +140,7 @@ class CheckPasswordView(views.APIView):
 
         return Response({'message': '입력값 오류', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
     
-# 📌 [공통] 비밀번호 변경
+# ✅ [공통] 비밀번호 변경
 class ChangePasswordView(views.APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PasswordUpdateSerializer
@@ -162,34 +166,29 @@ class ChangePasswordView(views.APIView):
 class UserDeleteView(views.APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        user = request.user
-        auth_provider = user.auth_provider
-        return Response({"user type":auth_provider})
-
     def post(self, request):
         serializer = UserDeleteSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         user = request.user
         auth_provider = user.auth_provider 
-        reason = serializer.validated_data["reason"]
+        reason_codes = serializer.validated_data["reason"]  # 리스트 형태
         custom_reason = serializer.validated_data.get("custom_reason", "")
-
-        if auth_provider == "email":
-            password = serializer.validated_data["password"]
-            if not user.check_password(password):
-                return Response({"message": "비밀번호가 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
         user_deletion = UserDeletion.objects.create(
             user=user,
-            reason=reason,
-            custom_reason=custom_reason if reason == 7 else "",
+            custom_reason=custom_reason,
             deleted_at=now()
         )
 
+        reasons = WithdrawalReason.objects.filter(code__in=reason_codes)
+        user_deletion.reason.set(reasons) 
+
         user_deletion.user = None
         user_deletion.save()
+
+        if auth_provider == "email":
+            VerifyEmail.objects.filter(email=user.email).delete()
 
         user.delete()
 
@@ -205,16 +204,19 @@ class ConsentView(views.APIView):
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
         return Response({'error': serializer.errors}, status=400)
 
-# ✅ [일반] 이메일 인증 요청 (최종)
+# ✅ [일반] 이메일 인증 요청
 class RequestEmailVerificationView(views.APIView):
     def post(self, request):
         email = request.data.get("email")
         if not email:
             return Response({"error": "이메일은 필수입니다."}, status=400)
 
-        # 이미 존재하는 유저가 있다면 거부해도 됨
+        # 이미 가입된 이메일 거부
         if User.objects.filter(email=email).exists():
             return Response({"error": "이미 가입된 이메일입니다."}, status=400)
+
+        # VerifyEmail 객체 생성 or 조회
+        verify_obj, created = VerifyEmail.objects.get_or_create(email=email)
 
         # 토큰 생성
         token = EmailVerificationTokenGenerator().make_token(email)
@@ -232,7 +234,7 @@ class RequestEmailVerificationView(views.APIView):
 
         email_message = EmailMultiAlternatives(
             subject=subject,
-            body="HTML 지원되지 않는 클라이언트를 위한 텍스트 버전입니다.",  # fallback
+            body="HTML 지원되지 않는 클라이언트를 위한 텍스트 버전입니다.",
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[email],
         )
@@ -240,8 +242,8 @@ class RequestEmailVerificationView(views.APIView):
         email_message.send()
 
         return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
-    
-# ✅ [일반] 이메일 인증
+
+# 📌 [일반] 이메일 인증 처리
 class VerifyEmailView(views.APIView):
     def get(self, request, uidb64, token):
         try:
@@ -249,31 +251,39 @@ class VerifyEmailView(views.APIView):
         except (ValueError, TypeError, OverflowError):
             return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 토큰 확인
-        token_valid = EmailVerificationTokenGenerator().check_token(email, token)
-        if not token_valid:
+        if not EmailVerificationTokenGenerator().check_token(email, token):
             return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        #return Response({
-        #    'message': '이메일 인증이 완료되었습니다. 회원가입을 계속 진행해주세요!',
-        #    'email': email
-        #}, status=status.HTTP_200_OK)
-        return render(
-            request,
-            "email_verified.html",
-            {"email": email},
-            content_type="text/html"
-        )
+        # 인증 상태 업데이트
+        verify_obj, _ = VerifyEmail.objects.get_or_create(email=email)
+        verify_obj.is_verified = True
+        verify_obj.save()
+
+        # 앱으로 이동
+        return redirect(f"whatdoyousing://auth/signup?cur_step=3&verified_email={email}")
+    
+# ✅ [일반] 이메일 인증 여부 확인
+class CheckEmailVerificationView(views.APIView):
+    def get(self, request):
+        email = request.query_params.get("email")
+        if not email:
+            return Response({"error": "이메일은 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            verify_obj = VerifyEmail.objects.get(email=email)
+        except VerifyEmail.DoesNotExist:
+            return Response({"error": "인증 요청이 존재하지 않습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({"is_verified": verify_obj.is_verified}, status=status.HTTP_200_OK)
+
 
 # ✅ [일반] 회원가입
 class GeneralSignUpView(views.APIView):
     permission_classes = [AllowAny]
     serializer_class = GeneralSignUpSerializer
 
-    # 이메일 인증 미완료 시 가입 못하도록? 가능한가..? 이메일 인증 시 유저 객체 생성을 안해가지고 흠.. 뭐 email_is_verified 이런걸 만들어서
-    # 근데 그걸 만들어도 .. 유저 객체가 만들어지는게 아니잖아.. 그럼 이메일 테이블을 아예 따로 만들어야? (분리해야?)
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data) 
 
         if serializer.is_valid():
             user = serializer.save()

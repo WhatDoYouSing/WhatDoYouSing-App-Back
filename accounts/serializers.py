@@ -93,24 +93,22 @@ class PasswordUpdateSerializer(serializers.Serializer):
     
 # ✅ 유저 탈퇴 serializer    
 class UserDeleteSerializer(serializers.Serializer):
-    password = serializers.CharField(max_length=128, write_only=True,  style={'input_type': 'password'}, required=False)
-    reason = serializers.ChoiceField(choices=UserDeletion.REASON_CHOICES, required=True)
+    reason = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=True,
+        allow_empty=False
+    )
     custom_reason = serializers.CharField(required=False, allow_blank=True)
     confirm_delete = serializers.BooleanField(required=True)
 
     def validate(self, data):
         user = self.context['request'].user
 
+        # 탈퇴 동의 확인
         if not data.get("confirm_delete"):
             raise serializers.ValidationError({"confirm_delete": "탈퇴를 진행하려면 동의해야 합니다."})
 
-        if data["reason"] == 7 and not data.get("custom_reason"):
-            raise serializers.ValidationError({"custom_reason": "기타 사유를 입력해야 합니다."})
-
-        if user.auth_provider == "email" and "password" not in data:
-            raise serializers.ValidationError({"password": "일반 회원은 비밀번호를 입력해야 합니다."})
-
-        return data  
+        return data
 
 # 일반 유저 ############################################################################################
 
@@ -157,7 +155,7 @@ class GeneralSignUpSerializer(AbstractSignupSerializer):
             push_notification_consent=validated_data.get('push_notification_consent', False),
             marketing_consent=validated_data.get('marketing_consent', False)
         )
-        user.is_active=False
+        user.is_active=True
         user.set_password(validated_data['password'])  # 비밀번호 해싱
         user.save()
         return user

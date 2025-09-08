@@ -60,17 +60,24 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
-    
+
+class WithdrawalReason(models.Model):
+    code = models.IntegerField(unique=True)
+    label = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.label    
+
 class UserDeletion(models.Model):
-    REASON_CHOICES = [
-        (1, "다른 사용자들의 콘텐츠가 부족해서"),
-        (2, "올리고 싶은 콘텐츠가 적어서"),
-        (3, "기능 사용 방법이 편리하지 않아서"),
-        (4, "원하는 기능이 없어서"),
-        (5, "호기심에 설치한 앱이어서"),
-        (6, "앱을 사용할 시간이 없어서"),
-        (7, "기타"),
-    ]
+    #REASON_CHOICES = [
+    #    (1, "다른 사용자들의 콘텐츠가 부족해서"),
+    #    (2, "올리고 싶은 콘텐츠가 적어서"),
+    #    (3, "기능 사용 방법이 편리하지 않아서"),
+    #    (4, "원하는 기능이 없어서"),
+    #    (5, "호기심에 설치한 앱이어서"),
+    #    (6, "앱을 사용할 시간이 없어서"),
+    #    (7, "기타"),
+    #]
     # 탈퇴한 사용자 ID (외래키: User 모델 참조)
     user = models.ForeignKey(
         'User',  # User 모델 참조
@@ -81,10 +88,11 @@ class UserDeletion(models.Model):
         verbose_name="탈퇴한 사용자"
     )
 
-    reason = models.IntegerField(
-        choices=REASON_CHOICES,
-        verbose_name="탈퇴 사유"
-    )  # 제공된 선택지에서 선택
+    #reason = models.IntegerField(
+    #    choices=REASON_CHOICES,
+    #    verbose_name="탈퇴 사유"
+    #)
+    reason = models.ManyToManyField(WithdrawalReason)
     custom_reason = models.TextField(
         null=True, blank=True,
         verbose_name="기타 사유"
@@ -101,7 +109,8 @@ class UserDeletion(models.Model):
 
     def __str__(self):
         user_str = self.user.username if self.user else "탈퇴한 유저"
-        return f"{user_str} (사유: {self.reason})"
+        reasons = ", ".join([str(r) for r in self.reason.all()])
+        return f"{user_str} (사유: {reasons})"
 
 class UserTitle(models.Model):
     user = models.ForeignKey(
@@ -126,3 +135,7 @@ class UserTitle(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.title.name}"  # 유저와 칭호 이름 표시
+    
+class VerifyEmail(models.Model):
+    email = models.EmailField(unique=True)
+    is_verified = models.BooleanField(default=False)
