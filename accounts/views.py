@@ -3,6 +3,7 @@ from rest_framework import views, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from .serializers import *
 from rest_framework import generics
 from accounts.tokens import EmailVerificationTokenGenerator
@@ -23,6 +24,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from datetime import datetime, timezone
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -56,18 +58,45 @@ APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
 
 # 일반/소셜 공통, 유저 관리 ############################################################################################
 
-# ✅ [공통] 리프레시 토큰 리프레시
 class RefreshTokenView(views.APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         raw_refresh = request.data.get("refresh")
         if not raw_refresh:
-            return Response({"message": "refresh 토큰이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "refresh 토큰이 필요합니다."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         serializer = TokenRefreshSerializer(data={"refresh": raw_refresh})
         serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+        data = serializer.validated_data  # {"access": "...", "refresh": "..."} or {"access": "..."}
+
+        # 만료 시각 파싱
+        access_token = data.get("access")
+        access_exp_iso = None
+        if access_token:
+            at = AccessToken(access_token)
+            access_exp_iso = datetime.fromtimestamp(at["exp"], tz=timezone.utc).isoformat()
+
+        refresh_token = data.get("refresh")  # ROTATE_REFRESH_TOKENS=True일 때만 존재
+        refresh_exp_iso = None
+        if refresh_token:
+            rt = RefreshToken(refresh_token)
+            refresh_exp_iso = datetime.fromtimestamp(rt["exp"], tz=timezone.utc).isoformat()
+
+        # 로그인 Serializer와 키 이름을 맞춤
+        resp = {
+            "access_token": access_token,
+            "access_token_exp": access_exp_iso,
+        }
+        if refresh_token:
+            resp.update({
+                "refresh_token": refresh_token,
+                "refresh_token_exp": refresh_exp_iso,
+            })
+
+        return Response(resp, status=status.HTTP_200_OK)
 
 # ✅ [공통] 랜덤 아이디 추천
 class RandomUsernameView(views.APIView):
