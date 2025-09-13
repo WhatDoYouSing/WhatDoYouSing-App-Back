@@ -10,6 +10,7 @@ from django.utils.dateparse import parse_date
 from calendar import monthrange
 from django.utils.dateparse import parse_date
 from social.models import *
+from django.db.models.functions import ExtractMonth
 
 # Create your views here.
 
@@ -178,6 +179,39 @@ class MyContentView(views.APIView):
                 serialized_data.append(MyPliSerializer(content).data)
 
         return Response(serialized_data, status=status.HTTP_200_OK)
+    
+# 📌 [마이페이지] 달력 뷰 연도별 유효 달 카운트
+class ActiveMonthsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        year_str = request.query_params.get("year")
+        if not year_str:
+            return Response({"message": "year 파라미터가 필요합니다. 예: ?year=2025"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            year = int(year_str)
+        except ValueError:
+            return Response({"message": "year는 정수여야 합니다. 예: ?year=2025"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+
+        # 각 모델에서 해당 연도에 생성된 레코드의 '월'만 추출
+        note_months_qs = (
+            Notes.objects.filter(user=user, created_at__year=year)
+            .annotate(month=ExtractMonth("created_at"))
+            .values_list("month", flat=True)
+            .distinct()
+        )
+        pli_months_qs = (
+            Plis.objects.filter(user=user, created_at__year=year)
+            .annotate(month=ExtractMonth("created_at"))
+            .values_list("month", flat=True)
+            .distinct()
+        )
+
+        months = sorted(set(list(note_months_qs) + list(pli_months_qs)))
+
+        return Response(months, status=status.HTTP_200_OK)
 
 # ✅ [마이페이지] 칭호 전부 가져오기 + 각 칭호 활성화 여부
 class TitleListView(views.APIView):
