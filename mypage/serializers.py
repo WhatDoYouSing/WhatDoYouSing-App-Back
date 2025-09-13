@@ -16,7 +16,7 @@ class MyPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         #팔로워 팔로우 목록 api 추가되면 카운트 가져오기
-        fields = ['id','profile','title_selection','serviceID', 'nickname','follower','following','auth_provider']
+        fields = ['id','profile','title_selection','serviceID', 'nickname','follower','following','auth_provider', 'email']
 
     def get_follower(self, obj):
         # 팔로우 당한 사람 = 나를 팔로우한 유저 수
