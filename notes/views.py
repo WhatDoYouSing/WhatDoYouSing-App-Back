@@ -20,6 +20,7 @@ from .serializers import *
 from django.db.models import Count
 from moderation.mixins import BlockFilterMixin
 from moderation.models import *
+from django.db.models import Exists, OuterRef, Count, Prefetch
 
 
 class NoteDetailView(BlockFilterMixin, APIView):
@@ -236,7 +237,9 @@ class NoteEmotionToggleView(APIView):
 
         # 다른 감정을 이미 남겼으면 → 그거 삭제
         if existing_emotion:
-            Emotions.objects.filter(id=existing_emotion.emotion.id).update(count=F("count") - 1)
+            Emotions.objects.filter(id=existing_emotion.emotion.id).update(
+                count=F("count") - 1
+            )
             existing_emotion.delete()
 
         # 새로운 감정 추가
@@ -252,7 +255,6 @@ class NoteEmotionToggleView(APIView):
                 {"error": "감정 추가 중 오류가 발생했습니다."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 
 class SameUserContentsView(APIView):
@@ -464,11 +466,38 @@ class NoteCommentListView(BlockFilterMixin, APIView):
             scrap_list__user=user, content_id=note_id
         ).exists()
 
+        comment_is_liked = Exists(
+            NoteComment.objects.filter(pk=OuterRef("pk"), likes__id=user.id)
+        )
+        reply_is_liked = Exists(
+            NoteReply.objects.filter(pk=OuterRef("pk"), likes__id=user.id)
+        )
+
+        # 대댓글 queryset: is_liked/likes_count 미리 주석 + user select
+        replies_qs = (
+            NoteReply.objects.select_related("user")
+            .annotate(
+                is_liked=reply_is_liked,
+                likes_count=Count("likes", distinct=True),
+            )
+            .order_by("created_at")
+        )
+
         # 부모 댓글 (최상위 댓글) 가져오기
         # comments = NoteComment.objects.filter(note=note).order_by("created_at")
         # 차단한 유저의 댓글 제외
         # 부모 댓글
-        comments = NoteComment.objects.filter(note=note).order_by("created_at")
+        comments = (
+            NoteComment.objects.filter(note=note)
+            .select_related("user")
+            .annotate(
+                is_liked=comment_is_liked,
+                likes_count=Count("likes", distinct=True),
+                reply_count=Count("replies", distinct=True),
+            )
+            .prefetch_related(Prefetch("replies", queryset=replies_qs))
+            .order_by("created_at")
+        )
 
         serialized_comments = []
         for comment in comments:
@@ -477,7 +506,11 @@ class NoteCommentListView(BlockFilterMixin, APIView):
             )
 
             # 대댓글
-            replies = NoteReply.objects.filter(comment=comment).order_by("created_at")
+            replies = (
+                NoteReply.objects.filter(comment=comment)
+                .annotate(is_liked=reply_is_liked)
+                .order_by("created_at")
+            )
 
             serialized_replies = []
             for reply in replies:
@@ -502,6 +535,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                                 "nickname": reply.user.nickname,
                                 "profile": reply.user.profile,
                             },
+                            "is_liked": bool(getattr(comment, "is_liked", False)),
                             "parent_nickname": comment.user.nickname,  # 부모 댓글의 닉네임 (언급된 닉네임)
                             "blocked": False,
                             "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
@@ -531,6 +565,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                             "nickname": comment.user.nickname,
                             "profile": comment.user.profile,
                         },
+                        "is_liked": bool(getattr(comment, "is_liked", False)),
                         "blocked": False,
                         "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
                         "content": comment.content,
@@ -552,7 +587,6 @@ class NoteCommentListView(BlockFilterMixin, APIView):
             },
             status=status.HTTP_200_OK,
         )
-
 
 
 class NoteCommentEditDeleteView(APIView):
@@ -698,12 +732,14 @@ class ToggleLikeView(APIView):
 
     def post(self, request, content_id):
         user = request.user
-        content_type = request.query_params.get("type")   # note / pli
-        level = request.query_params.get("level")        # comment / reply
+        content_type = request.query_params.get("type")  # note / pli
+        level = request.query_params.get("level")  # comment / reply
 
         if not (content_type and level and content_id):
-            return Response({"message": "type, level, id 파라미터가 필요합니다."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "type, level, id 파라미터가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         model = None
         if content_type == "note" and level == "comment":
@@ -716,8 +752,10 @@ class ToggleLikeView(APIView):
             model = PliReply
 
         if not model:
-            return Response({"message": "유효하지 않은 type/level 입니다."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "유효하지 않은 type/level 입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         obj = get_object_or_404(model, id=content_id)
 

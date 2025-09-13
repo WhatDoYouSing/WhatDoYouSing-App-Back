@@ -3,12 +3,21 @@ from .models import NoteComment, NoteReply
 
 
 class NoteReplySerializer(serializers.ModelSerializer):
+    is_liked = serializers.BooleanField(read_only=True)  # 추가
     user = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
 
     class Meta:
         model = NoteReply
-        fields = ["id", "user", "created_at", "content", "likes_count", "mention"]
+        fields = [
+            "id",
+            "user",
+            "is_liked",
+            "created_at",
+            "content",
+            "likes_count",
+            "mention",
+        ]
 
     def get_user(self, obj):
         return {
@@ -23,6 +32,7 @@ class NoteReplySerializer(serializers.ModelSerializer):
 
 
 class NoteCommentSerializer(serializers.ModelSerializer):
+    is_liked = serializers.BooleanField(read_only=True)  # 추가
     user = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
     replies = NoteReplySerializer(many=True, read_only=True)  # 대댓글 포함
@@ -33,6 +43,7 @@ class NoteCommentSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "user",
+            "is_liked",
             "created_at",
             "content",
             "reply_count",
