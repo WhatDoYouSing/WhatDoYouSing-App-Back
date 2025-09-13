@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from django.db.models import Exists, OuterRef, Count, Prefetch
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
@@ -56,7 +57,9 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
 
         # 플리에 포함된 노트 리스트 가져오기
         pli_notes = PliNotes.objects.filter(plis=pli)
-        blocked_note_ids = NoteBlock.objects.filter(blocker=user).values_list("note_id", flat=True)
+        blocked_note_ids = NoteBlock.objects.filter(blocker=user).values_list(
+            "note_id", flat=True
+        )
         note_data = []
         for pli_note in pli_notes:
             note = pli_note.notes
@@ -290,8 +293,33 @@ class PliCommentListView(BlockFilterMixin, APIView):
             scrap_list__user=user, content_id=pli_id
         ).exists()
 
+        comment_is_liked = Exists(
+            PliComment.objects.filter(pk=OuterRef("pk"), likes__id=user.id)
+        )
+        reply_is_liked = Exists(
+            PliReply.objects.filter(pk=OuterRef("pk"), likes__id=user.id)
+        )
+        replies_qs = (
+            PliReply.objects.select_related("user")
+            .annotate(
+                is_liked=reply_is_liked,
+                likes_count=Count("likes", distinct=True),
+            )
+            .order_by("created_at")
+        )
         # 부모 댓글
-        comments = PliComment.objects.filter(pli=pli).order_by("created_at")
+        # comments = PliComment.objects.filter(pli=pli).order_by("created_at")
+        comments = (
+            PliComment.objects.filter(pli=pli)
+            .select_related("user")
+            .annotate(
+                is_liked=comment_is_liked,
+                likes_count=Count("likes", distinct=True),
+                reply_count=Count("replies", distinct=True),
+            )
+            .prefetch_related(Prefetch("replies", queryset=replies_qs))
+            .order_by("created_at")
+        )
 
         serialized_comments = []
         for comment in comments:
@@ -300,8 +328,12 @@ class PliCommentListView(BlockFilterMixin, APIView):
             )
 
             # 대댓글 전체
-            replies = PliReply.objects.filter(comment=comment).order_by("created_at")
-
+            # replies = PliReply.objects.filter(comment=comment).order_by("created_at")
+            replies = (
+                PliReply.objects.filter(comment=comment)
+                .annotate(is_liked=reply_is_liked)
+                .order_by("created_at")
+            )
             serialized_replies = []
             for reply in replies:
                 is_blocked_reply = (
@@ -325,6 +357,9 @@ class PliCommentListView(BlockFilterMixin, APIView):
                                 "nickname": reply.user.nickname,
                                 "profile": reply.user.profile,
                             },
+                            "is_liked": bool(
+                                getattr(comment, "is_liked", False)
+                            ),  # 추가
                             "parent_nickname": comment.user.nickname,
                             "blocked": False,
                             "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
@@ -353,6 +388,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                             "nickname": comment.user.nickname,
                             "profile": comment.user.profile,
                         },
+                        "is_liked": bool(getattr(comment, "is_liked", False)),  # 추가
                         "blocked": False,
                         "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
                         "content": comment.content,
