@@ -254,12 +254,12 @@ class TitleChoiceView(views.APIView):
         return Response({'message': '활성화된 칭호 조회 성공', 'data': serializer.data}, status=status.HTTP_200_OK)
 
     def patch(self, request):
-        new_title_id = request.data.get('title_id')
-        if not new_title_id:
-            return Response({'message': '칭호 ID가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        new_title_name = request.data.get('title_name')
+        if not new_title_name:
+            return Response({'message': '칭호가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            new_title = Title.objects.get(id=new_title_id)
+            new_title = Title.objects.get(name=new_title_name)
             if not UserTitle.objects.filter(user=request.user, title=new_title).exists():
                 return Response({'message': '해당 칭호가 활성화되지 않았습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import views, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from .serializers import *
 from rest_framework import generics
 from accounts.tokens import EmailVerificationTokenGenerator
@@ -54,6 +55,19 @@ APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
 # Create your views here.
 
 # 일반/소셜 공통, 유저 관리 ############################################################################################
+
+# ✅ [공통] 리프레시 토큰 리프레시
+class RefreshTokenView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        raw_refresh = request.data.get("refresh")
+        if not raw_refresh:
+            return Response({"message": "refresh 토큰이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = TokenRefreshSerializer(data={"refresh": raw_refresh})
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 # ✅ [공통] 랜덤 아이디 추천
 class RandomUsernameView(views.APIView):
