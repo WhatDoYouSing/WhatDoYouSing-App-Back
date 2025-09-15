@@ -164,7 +164,7 @@ class MyContentView(views.APIView):
             serializer = MyNoteSerializer(notes.order_by('-created_at'), many=True)
             return Response(serializer.data)
 
-        elif content_type == "pli":
+        elif content_type == "pli": 
             serializer = MyPliSerializer(plis.order_by('-created_at'), many=True)
             return Response(serializer.data)
 

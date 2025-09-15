@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from accounts.models import *
-from notes.models import Notes, Plis
+from notes.models import Notes, Plis, PliNotes
 import random
 from social.models import *
 
@@ -29,27 +29,69 @@ class MyPageSerializer(serializers.ModelSerializer):
 # 📌 내 노트 Serializer 
 class MyNoteSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    serviceID = serializers.SerializerMethodField()
+    nickname = serializers.SerializerMethodField()
+    profile = serializers.SerializerMethodField()
+
     class Meta:
         model = Notes
         fields = [
-            'type', 'id', 'user', 'created_at', 'is_updated', 'visibility', 
+            'type', 'id', 'user', 'serviceID', 'nickname', 'profile', 'created_at', 'is_updated', 'visibility', 
             'emotion', 'song_title', 'artist', 'lyrics', 'album_art', 'memo'
         ]
     def get_type(self,obj):
         return "note"
+    
+    def get_serviceID(self, obj):
+        return obj.user.serviceID if isinstance(obj.user, User) else None
+
+    def get_nickname(self, obj):
+        return obj.user.nickname if isinstance(obj.user, User) else None
+
+    def get_profile(self, obj):
+        return obj.user.profile if isinstance(obj.user, User) else None
 
 # 📌 내 플리 Serializer 
 class MyPliSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
+    serviceID = serializers.SerializerMethodField()
+    nickname = serializers.SerializerMethodField()
+    profile = serializers.SerializerMethodField()
+    note_count = serializers.SerializerMethodField()
+    pli_memo = serializers.SerializerMethodField()
+
+    # 플리 안에 노트 몇개인지
+    # 플리 내용
+
     class Meta:
         model = Plis
         fields = [
-            'type', 'id', 'title', 'user', 'created_at', 'is_updated', 'visibility', 
+            'type', 'id', 'title', 'note_count', 'pli_memo', 'user', 'serviceID', 'nickname', 'profile', 'created_at', 'is_updated', 'visibility', 
         ]
-        # 플리 내 노트 수 카운트 필드 추가해야함
-        # 플리 내용을 뭘 보여줘야되지...?
+
     def get_type(self,obj):
         return "pli"
+    
+    def get_serviceID(self, obj):
+        return obj.user.serviceID if isinstance(obj.user, User) else None
+
+    def get_nickname(self, obj):
+        return obj.user.nickname if isinstance(obj.user, User) else None
+
+    def get_profile(self, obj):
+        return obj.user.profile if isinstance(obj.user, User) else None
+    
+    def get_note_count(self, obj):
+        return PliNotes.objects.filter(plis=obj).count()
+    
+    def get_pli_memo(self, obj):
+        memo = (
+            PliNotes.objects.filter(plis=obj)
+            .order_by('created_at', 'id')
+            .values_list('note_memo', flat=True)
+            .first()
+        )
+        return memo
 
 # 📌 내 보관함 Serializer 
 #class MyCollectionSerializer(serializers.ModelSerializer):
