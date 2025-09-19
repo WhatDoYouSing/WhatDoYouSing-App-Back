@@ -180,7 +180,7 @@ class MyContentView(views.APIView):
 
         return Response(serialized_data, status=status.HTTP_200_OK)
     
-# 📌 [마이페이지] 달력 뷰 연도별 유효 달 카운트
+# ✅ [마이페이지] 달력 뷰 연도별 유효 달 카운트
 class ActiveMonthsView(views.APIView):
     permission_classes = [IsAuthenticated]
 
@@ -210,6 +210,76 @@ class ActiveMonthsView(views.APIView):
         )
 
         months = sorted(set(list(note_months_qs) + list(pli_months_qs)))
+
+        return Response(months, status=status.HTTP_200_OK)
+    
+# ✅ [마이페이지-타인] 달력 뷰 연도별 유효 달 카운트
+class OthersActiveMonthsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    User = get_user_model()
+
+    def get(self, request, *args, **kwargs):
+        year_str = request.query_params.get("year")
+        target_id_str = request.query_params.get("id")
+
+        if not year_str:
+            return Response(
+                {"message": "year 파라미터가 필요합니다. 예: ?year=2025"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            year = int(year_str)
+        except ValueError:
+            return Response(
+                {"message": "year는 정수여야 합니다. 예: ?year=2025"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not target_id_str:
+            return Response(
+                {"message": "조회하려는 타인의 id(pk)가 필요합니다. 예: ?id=123&year=2025"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            target_id = int(target_id_str)
+        except ValueError:
+            return Response(
+                {"message": "id(pk)는 정수여야 합니다. 예: ?id=123&year=2025"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target_user = get_object_or_404(User, id=target_id)
+        me = request.user
+
+        i_follow    = UserFollows.objects.filter(follower=me, following=target_user).exists()
+        they_follow = UserFollows.objects.filter(follower=target_user, following=me).exists()
+        mutual = i_follow and they_follow
+
+        allowed_visibilities = ["public"] if not mutual else ["public", "friends"]
+
+        note_months_qs = (
+            Notes.objects.filter(
+                user=target_user,
+                created_at__year=year,
+                visibility__in=allowed_visibilities,
+            )
+            .annotate(month=ExtractMonth("created_at"))
+            .values_list("month", flat=True)
+            .distinct()
+        )
+
+        pli_months_qs = (
+            Plis.objects.filter(
+                user=target_user,
+                created_at__year=year,
+                visibility__in=allowed_visibilities,
+            )
+            .annotate(month=ExtractMonth("created_at"))
+            .values_list("month", flat=True)
+            .distinct()
+        )
+
+        months = sorted(set(note_months_qs) | set(pli_months_qs))
 
         return Response(months, status=status.HTTP_200_OK)
 
