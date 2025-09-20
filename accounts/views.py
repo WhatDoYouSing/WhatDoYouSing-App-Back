@@ -1,33 +1,32 @@
-from django.shortcuts import render, get_object_or_404
-from rest_framework import views, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
-from .serializers import *
-from rest_framework import generics
-from accounts.tokens import EmailVerificationTokenGenerator
-
-from dj_rest_auth.registration.views import SocialLoginView                 
-from allauth.socialaccount.providers.kakao import views as kakao_views     
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client  
-from allauth.socialaccount.providers.kakao.views import KakaoOAuth2Adapter
-from rest_framework.permissions import AllowAny
-from django.shortcuts import redirect
-
+from django.shortcuts import render, get_object_or_404, redirect
 from django.conf import settings
-from django.core.mail import send_mail
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.http import JsonResponse
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.template.loader import render_to_string
 from django.http import HttpResponse
-from datetime import datetime, timezone
+
+from rest_framework import views, status
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework import generics
+              
+from allauth.socialaccount.providers.kakao import views as kakao_views     
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client  
+from allauth.socialaccount.providers.kakao.views import KakaoOAuth2Adapter
+from dj_rest_auth.registration.views import SocialLoginView   
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+
+from .serializers import *
+from accounts.tokens import EmailVerificationTokenGenerator
+from datetime import datetime
 
 import hashlib
 import base64
@@ -54,10 +53,9 @@ APPLE_BASE_URL = "https://appleid.apple.com"
 APPLE_AUTH_URL = "https://appleid.apple.com/auth/authorize"
 APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
 
-# Create your views here.
-
 # 일반/소셜 공통, 유저 관리 ############################################################################################
 
+# ✅ [공통] 토큰 리프레시
 class RefreshTokenView(views.APIView):
     permission_classes = [AllowAny]
 
@@ -247,6 +245,7 @@ class ConsentView(views.APIView):
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
         return Response({'error': serializer.errors}, status=400)
 
+'''
 # ✅ [일반] 이메일 인증 요청
 class RequestEmailVerificationView(views.APIView):
     def post(self, request):
@@ -285,25 +284,71 @@ class RequestEmailVerificationView(views.APIView):
         email_message.send()
 
         return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
+'''
+
+class RequestEmailVerificationView(views.APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "이메일은 필수입니다."}, status=400)
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "이미 가입된 이메일입니다."}, status=400)
+
+        code = f"{random.randint(100000, 999999)}"
+        expires_at = timezone.now() + timezone.timedelta(minutes=5)
+
+        verify_obj, created = VerifyEmail.objects.update_or_create(
+            email=email,
+            defaults={"code": code, "is_verified": False, "expires_at": expires_at},
+        )
+
+        subject = "[왓두유씽] 이메일 인증 코드가 도착했어요!"
+        html_content = render_to_string("email.html", {
+            "code": code,
+        })
+
+        email_message = EmailMultiAlternatives(
+            subject=subject,
+            body=f"인증 코드: {code}\n이 코드는 5분간 유효합니다.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
+        )
+        email_message.attach_alternative(html_content, "text/html")
+        email_message.send()
+
+        return Response({"message": "인증 코드가 이메일로 발송되었습니다."}, status=200)
+
+        
 
 # 📌 [일반] 이메일 인증 처리
 class VerifyEmailView(views.APIView):
-    def get(self, request, uidb64, token):
+    def post(self, request):
+        email = request.data.get("email")
+        code = request.data.get("code")
+
+        if not email or not code:
+            return Response({"error": "이메일과 코드 모두 필요합니다."}, status=400)
+
         try:
-            email = force_str(urlsafe_base64_decode(uidb64))
-        except (ValueError, TypeError, OverflowError):
-            return Response({'error': '유효하지 않은 링크입니다.'}, status=status.HTTP_400_BAD_REQUEST)
+            verify_obj = VerifyEmail.objects.get(email=email)
+        except VerifyEmail.DoesNotExist:
+            return Response({"error": "해당 이메일로 인증 요청이 없습니다."}, status=404)
+        
+        if verify_obj.is_expired():
+            return Response({"error": "인증 코드가 만료되었습니다."}, status=400)
 
-        if not EmailVerificationTokenGenerator().check_token(email, token):
-            return Response({'error': '토큰이 유효하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        if verify_obj.is_verified:
+            return Response({"message": "이미 인증된 이메일입니다."}, status=200)
 
-        # 인증 상태 업데이트
-        verify_obj, _ = VerifyEmail.objects.get_or_create(email=email)
+        if verify_obj.code != code:
+            return Response({"error": "인증 코드가 일치하지 않습니다."}, status=400)
+
+        # 인증 처리
         verify_obj.is_verified = True
         verify_obj.save()
 
-        # 앱으로 이동
-        return redirect(f"whatdoyousing://auth/signup?cur_step=3&verified_email={email}")
+        return Response({"message": "이메일 인증이 완료되었습니다."}, status=200)
     
 # ✅ [일반] 이메일 인증 여부 확인
 class CheckEmailVerificationView(views.APIView):

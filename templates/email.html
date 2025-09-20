@@ -28,15 +28,26 @@
         <!-- 본문 -->
         <p style="font-size: 14px; color: #33292C; line-height: 1.7;">
             왓두유씽 회원가입을 위해 이메일 주소 인증 요청을 해 주셔서 감사합니다. <br>
-            아래 버튼을 클릭하여 회원가입 절차를 진행해 주세요 :)
+            앱으로 돌아가 아래의 인증코드를 입력하고 회원가입을 완료해 주세요.
         </p>
 
         <!-- 인증 버튼 -->
-        <div style="margin-top: 20px; margin-bottom: 30px;">
+        <!--div style="margin-top: 20px; margin-bottom: 30px;">
             <a href="{{ verification_link }}" style="background-color: #33292C; color: #F5EDF0; padding: 12px 24px; border-radius: 2px; text-decoration: none; display: inline-block;">
             이메일 주소 인증하기
             </a>
+        </div-->
+
+        <div style="margin-top: 20px; margin-bottom: 30px;">
+          <div style="background-color: #F5EDF0; color: #33292C; padding: 12px 24px; border-radius: 2px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 4px;">
+            {{ code }}
+          </div>
         </div>
+
+        <p style="font-size: 14px; color: #33292C; line-height: 1.7;">
+            해당 인증코드는 5분 동안 유효합니다. <br>
+            인증코드가 만료된 경우에는 앱에서 '인증코드 재발송' 버튼을 눌러주세요.
+        </p>
 
       </div>
     </div>

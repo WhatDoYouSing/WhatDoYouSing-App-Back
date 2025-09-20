@@ -16,9 +16,9 @@ urlpatterns = [
 
     # ✅ [일반] 일반 회원가입 & 로그인
     path('consent/', ConsentView.as_view()), # 회원가입 전 약관 동의
-    path('verify-email/', RequestEmailVerificationView.as_view()),  # 이메일 인증 요청
-    path('verify-email/<uidb64>/<token>/', VerifyEmailView.as_view(), name='verify_email'), # 이메일 인증 시 redirection
-    path('check-email/', CheckEmailVerificationView.as_view()),
+    path('email/request/', RequestEmailVerificationView.as_view()),  # 이메일 인증 요청
+    path('email/verify/', VerifyEmailView.as_view(), name='verify_email'), # 이메일 코드 입력 
+    path('email/check/', CheckEmailVerificationView.as_view()),
     path('signup/', GeneralSignUpView.as_view()),  # 일반 회원가입
     path('login/', LogInView.as_view()),  # 일반 로그인
     
