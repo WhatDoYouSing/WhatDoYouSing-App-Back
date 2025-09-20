@@ -12,4 +12,5 @@ urlpatterns = [
     path('others/profile/', OthersPageView.as_view()),
     path('others/contents/', OthersContentView.as_view()),
     path('count/', ActiveMonthsView.as_view()),
+    path('others/count/', OthersActiveMonthsView.as_view()),
 ]

@@ -147,3 +147,100 @@ class FollowToggleView(APIView):
                 {"message": f"{target_user.nickname}님을 팔로우했습니다."},
                 status=status.HTTP_201_CREATED,
             )
+        
+class OthersFollowerListView(BlockFilterMixin, APIView):
+    permission_classes = [IsAuthenticated]
+    block_model = User
+
+    def get(self, request):
+        target_id = request.query_params.get("id")
+        if not target_id:
+            return Response({"message": "조회 대상 id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            target_id = int(target_id)
+        except ValueError:
+            return Response({"message": "id는 정수여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        target_user = get_object_or_404(User, id=target_id)
+
+        # 타겟을 팔로우하는 사람들 (followers of target)
+        follower_ids = UserFollows.objects.filter(following=target_user).values_list("follower_id", flat=True)
+
+        # 타겟이 팔로우하는 사람들 (for mutual check)
+        target_following_ids = set(
+            UserFollows.objects.filter(follower=target_user).values_list("following_id", flat=True)
+        )
+
+        follower_users = self.filter_blocked(User.objects.filter(id__in=follower_ids))
+
+        result = []
+        for u in follower_users:
+            result.append(
+                {
+                    "id": u.id,
+                    "title": (u.title_selection.name if getattr(u, "title_selection", None) else None),
+                    "serviceID": u.serviceID,
+                    "nickname": u.nickname,
+                    "profile": u.profile,
+                    # 타겟이 해당 유저를 팔로우하고 있으면 True (타겟 기준 상호팔)
+                    "following": u.id in target_following_ids,
+                }
+            )
+
+        return Response(
+            {
+                "message": "타인 팔로워 목록 조회 성공",
+                "data": {"target_nickname": target_user.nickname, "followers": result},
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class OthersFollowingListView(BlockFilterMixin, APIView):
+    permission_classes = [IsAuthenticated]
+    block_model = User
+
+    def get(self, request):
+        target_id = request.query_params.get("id")
+        if not target_id:
+            return Response({"message": "조회 대상 id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            target_id = int(target_id)
+        except ValueError:
+            return Response({"message": "id는 정수여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        target_user = get_object_or_404(User, id=target_id)
+
+        # 타겟이 팔로우한 유저들 (followings of target)
+        following_ids = UserFollows.objects.filter(follower=target_user).values_list("following_id", flat=True)
+        following_users = User.objects.filter(id__in=following_ids)
+        filtered_following_users = self.filter_blocked(following_users)
+
+        # 타겟을 팔로우하는 유저들 (for mutual check)
+        followers_of_target = set(
+            UserFollows.objects.filter(following=target_user).values_list("follower_id", flat=True)
+        )
+
+        result = []
+        for u in filtered_following_users:
+            result.append(
+                {
+                    "id": u.id,
+                    "title": (u.title_selection.name if getattr(u, "title_selection", None) else None),
+                    "serviceID": u.serviceID,
+                    "nickname": u.nickname,
+                    "profile": u.profile,
+                    # 해당 유저가 타겟을 팔로우하고 있으면 True (타겟 기준 상호팔)
+                    "following": u.id in followers_of_target,
+                }
+            )
+
+        return Response(
+            {
+                "message": "타인 팔로잉 목록 조회 성공",
+                "data": {"target_nickname": target_user.nickname, "followings": result},
+            },
+            status=status.HTTP_200_OK,
+        )
