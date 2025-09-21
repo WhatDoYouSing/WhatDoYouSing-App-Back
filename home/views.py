@@ -247,7 +247,7 @@ class HomeFollowView(BlockFilterMixin, APIView):
         # Plis 필터링: 공개 플리 + 친구의 'friends' 공개 플리 + 자신이 작성한 플리
         plis = (
             Plis.objects.filter(
-                Q(user__in=friends_ids, visibility="public")
+                Q(user__in=following_ids, visibility="public")
                 | Q(user__in=friends_ids, visibility="friends")  # 친구가 작성한 플리
             )
             .exclude(user=user)
@@ -328,7 +328,7 @@ class HomeFollowPliView(BlockFilterMixin, APIView):
         # Plis 필터링: 공개 플리 + 친구의 'friends' 공개 플리 + 자신이 작성한 플리
         plis = (
             Plis.objects.filter(
-                Q(user__in=friends_ids, visibility="public")
+                Q(user__in=following_ids, visibility="public")
                 | Q(user__in=friends_ids, visibility="friends")  # 친구가 작성한 플리
             )
             .exclude(user=user)
@@ -371,23 +371,39 @@ class HomeFollowNoteView(BlockFilterMixin, APIView):
         # 임시 - 필요 시 페이지네이션 추가
 
         user = request.user
-        following_users = UserFollows.objects.filter(follower=user).values("following")
 
-        friends = UserFollows.objects.filter(
-            Q(follower=user)
-            & Q(
-                following__in=UserFollows.objects.filter(following=user).values(
-                    "follower"
-                )
+        # 1) 팔로잉 id 리스트 (자기 자신 제거)
+        following_ids = list(
+            UserFollows.objects.filter(follower=user)
+            .exclude(following=user)  # 안전장치: 본인 팔로우 레코드가 있어도 제거
+            .values_list("following_id", flat=True)
+        )
+
+        # 2) 나를 팔로우한 사람들 id (mutual 판별용)
+        followers_of_me_ids = list(
+            UserFollows.objects.filter(following=user).values_list(
+                "follower_id", flat=True
             )
-        ).values("following")
+        )
+
+        # 3) 서로 팔로우(친구)인 사람들의 id (자기 자신 제거)
+        friends_ids = list(
+            UserFollows.objects.filter(
+                follower=user, following_id__in=followers_of_me_ids
+            )
+            .exclude(following=user)
+            .values_list("following_id", flat=True)
+        )
 
         # Notes 필터링: 팔로우한 사람의 'public' 노트 + 친구의 'friends' 공개 노트 + 자신이 작성한 노트
-        notes = Notes.objects.filter(
-            Q(user__in=following_users, visibility="public")
-            | Q(user__in=friends, visibility="friends")  # 친구가 작성한 노트
-            | Q(user=user)  # 자신이 작성한 노트
-        ).order_by("-created_at")
+        notes = (
+            Notes.objects.filter(
+                Q(user__in=following_ids, visibility="public")
+                | Q(user__in=friends_ids, visibility="friends")  # 친구가 작성한 노트
+            )
+            .exclude(user=user)
+            .order_by("-created_at")
+        )
 
         self.block_model = Notes
         notes = self.filter_blocked(notes)
