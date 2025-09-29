@@ -110,8 +110,16 @@ class YT_NotesUploadSerializer(serializers.ModelSerializer):
 
 # 기본 앨범 커버 이미지 URL 리스트
 DEFAULT_ALBUM_ART_IMAGES = [
-    "https://img.freepik.com/premium-vector/white-texture-round-striped-surface-white-soft-cover_547648-928.jpg",
-    "https://images.unsplash.com/photo-1550684376-efcbd6e3f031?fm=jpg&q=60&w=3000&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8JUVBJUIyJTgwJUVDJTlEJTgwJUVDJTgzJTg5JTIwJUVCJUIwJUIwJUVBJUIyJUJEJUVEJTk5JTk0JUVCJUE5JUI0fGVufDB8fDB8fHww",
+    "https://ibb.co/Qv3qRk4n",
+    "https://ibb.co/jP61YYqn",
+    "https://ibb.co/nsYD3htM",
+    "https://ibb.co/MxvhwqFP",
+    "https://ibb.co/nsWN5XSY",
+    "https://ibb.co/whwqjzLg",
+    "https://ibb.co/xqJpQwCd",
+    "https://ibb.co/k6XWfNwh",
+    "https://ibb.co/j9x3F9M2",
+    "https://ibb.co/h0f1c8z",
 ]
 
 
