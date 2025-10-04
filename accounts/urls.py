@@ -9,6 +9,7 @@ urlpatterns = [
 
     # ✅ [공통] 유저 정보 관리
     path('refresh/', RefreshTokenView.as_view()), # 리프레시 토큰 리프레시
+    path('social/token/', SocialTokenView.as_view()), #소셜 토큰
     path('update/id/', ChangeServiceIDView.as_view()),  # 아이디 변경
     path('update/pw/', ChangePasswordView.as_view()),  # 비밀번호 변경
     path('checkpw/', CheckPasswordView.as_view()), # 비밀번호 확인

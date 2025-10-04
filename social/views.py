@@ -147,12 +147,13 @@ class FollowToggleView(APIView):
                 {"message": f"{target_user.nickname}님을 팔로우했습니다."},
                 status=status.HTTP_201_CREATED,
             )
-        
+
 class OthersFollowerListView(BlockFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
     block_model = User
 
     def get(self, request):
+        viewer = request.user  # 조회자
         target_id = request.query_params.get("id")
         if not target_id:
             return Response({"message": "조회 대상 id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
@@ -166,13 +167,16 @@ class OthersFollowerListView(BlockFilterMixin, APIView):
 
         # 타겟을 팔로우하는 사람들 (followers of target)
         follower_ids = UserFollows.objects.filter(following=target_user).values_list("follower_id", flat=True)
+        follower_users = User.objects.filter(id__in=follower_ids)
+        follower_users = self.filter_blocked(follower_users)  # viewer 기준 차단 필터
 
-        # 타겟이 팔로우하는 사람들 (for mutual check)
-        target_following_ids = set(
-            UserFollows.objects.filter(follower=target_user).values_list("following_id", flat=True)
-        )
-
-        follower_users = self.filter_blocked(User.objects.filter(id__in=follower_ids))
+        # 조회자 기준 팔로우/팔로워 집합
+        viewer_following_ids = set(
+            UserFollows.objects.filter(follower=viewer).values_list("following_id", flat=True)
+        )  # viewer -> others
+        viewer_follower_ids = set(
+            UserFollows.objects.filter(following=viewer).values_list("follower_id", flat=True)
+        )  # others -> viewer
 
         result = []
         for u in follower_users:
@@ -183,8 +187,8 @@ class OthersFollowerListView(BlockFilterMixin, APIView):
                     "serviceID": u.serviceID,
                     "nickname": u.nickname,
                     "profile": u.profile,
-                    # 타겟이 해당 유저를 팔로우하고 있으면 True (타겟 기준 상호팔)
-                    "following": u.id in target_following_ids,
+                    "following": u.id in viewer_following_ids,
+                    "follows_me": u.id in viewer_follower_ids,
                 }
             )
 
@@ -202,6 +206,7 @@ class OthersFollowingListView(BlockFilterMixin, APIView):
     block_model = User
 
     def get(self, request):
+        viewer = request.user  # 조회자
         target_id = request.query_params.get("id")
         if not target_id:
             return Response({"message": "조회 대상 id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
@@ -216,15 +221,18 @@ class OthersFollowingListView(BlockFilterMixin, APIView):
         # 타겟이 팔로우한 유저들 (followings of target)
         following_ids = UserFollows.objects.filter(follower=target_user).values_list("following_id", flat=True)
         following_users = User.objects.filter(id__in=following_ids)
-        filtered_following_users = self.filter_blocked(following_users)
+        following_users = self.filter_blocked(following_users)  # viewer 기준 차단 필터
 
-        # 타겟을 팔로우하는 유저들 (for mutual check)
-        followers_of_target = set(
-            UserFollows.objects.filter(following=target_user).values_list("follower_id", flat=True)
-        )
+        # 조회자 기준 팔로우/팔로워 집합
+        viewer_following_ids = set(
+            UserFollows.objects.filter(follower=viewer).values_list("following_id", flat=True)
+        )  # viewer -> others
+        viewer_follower_ids = set(
+            UserFollows.objects.filter(following=viewer).values_list("follower_id", flat=True)
+        )  # others -> viewer
 
         result = []
-        for u in filtered_following_users:
+        for u in following_users:
             result.append(
                 {
                     "id": u.id,
@@ -232,8 +240,8 @@ class OthersFollowingListView(BlockFilterMixin, APIView):
                     "serviceID": u.serviceID,
                     "nickname": u.nickname,
                     "profile": u.profile,
-                    # 해당 유저가 타겟을 팔로우하고 있으면 True (타겟 기준 상호팔)
-                    "following": u.id in followers_of_target,
+                    "following": u.id in viewer_following_ids,
+                    "follows_me": u.id in viewer_follower_ids,
                 }
             )
 

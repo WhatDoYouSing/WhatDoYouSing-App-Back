@@ -4,6 +4,7 @@ newvenv/
 newvenv
 
 spotify-tokens.py
+spotify-auth.py
 
 *.p8
 
