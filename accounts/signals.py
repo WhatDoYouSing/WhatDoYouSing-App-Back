@@ -12,7 +12,7 @@ from collects.models import *
 def assign_blank_title(sender, instance, created, **kwargs):
     if created:
         try:
-            blank_title = Title.objects.get(name="blank")
+            blank_title = Title.objects.get(name="칭호")
             UserTitle.objects.get_or_create(user=instance, title=blank_title)
             instance.title_selection = blank_title
             instance.profile = instance.profile or blank_title.emoji

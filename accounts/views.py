@@ -37,6 +37,7 @@ import string
 import os
 import time
 import jwt
+from jwt.algorithms import RSAAlgorithm
 
 BASE_URL = 'https://api.whatdoyousing.com/'
 
@@ -52,8 +53,31 @@ kakao_profile_uri = "https://kapi.kakao.com/v2/user/me"
 APPLE_BASE_URL = "https://appleid.apple.com"
 APPLE_AUTH_URL = "https://appleid.apple.com/auth/authorize"
 APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
+APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 
 # 일반/소셜 공통, 유저 관리 ############################################################################################
+
+# 📌 [애플] 보안 관련 토큰 설정
+def verify_apple_id_token(id_token, client_id):
+    res = requests.get(APPLE_KEYS_URL)
+    keys = res.json().get("keys", [])
+    client_id = settings.APPLE_CLIENT_ID
+    header = jwt.get_unverified_header(id_token)
+    kid = header.get("kid")
+    key = next((k for k in keys if k["kid"] == kid), None)
+    if not key:
+        raise ValueError("Apple public key not found")
+
+    public_key = RSAAlgorithm.from_jwk(key)
+    
+    decoded = jwt.decode(
+        id_token,
+        key=public_key,
+        algorithms=["RS256"],
+        audience=client_id,
+        issuer="https://appleid.apple.com"
+    )
+    return decoded
 
 # ✅ [공통] 토큰 리프레시
 class RefreshTokenView(views.APIView):
@@ -130,7 +154,10 @@ class SocialTokenView(views.APIView):
 
         elif provider == "apple":
             # ⚠️ 실제 운영에서는 애플 공개키 가져와 서명 검증 필수
-            decoded = jwt.decode(id_token, options={"verify_signature": False})
+            # decoded = jwt.decode(id_token, options={"verify_signature": False})
+
+            # 📌 배포용 서명 검증
+            decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
             sub = decoded.get("sub")
             email = decoded.get("email")
             social_id = f"apple_{sub}"
@@ -676,7 +703,10 @@ class AppleCallbackView(views.APIView):
             return Response({'error': 'id_token missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         # ⚠️ 서명 검증 비활성화 (개발용)
-        decoded = jwt.decode(id_token, options={"verify_signature": False})
+        # decoded = jwt.decode(id_token, options={"verify_signature": False})
+
+        # 📌 서명 검증 활성화 (배포용)
+        decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
         sub = decoded.get("sub")
         email = decoded.get("email")
 
@@ -704,3 +734,4 @@ class AppleCallbackView(views.APIView):
                 if serializer2.is_valid():
                     return Response({'message': '애플 회원가입 성공', 'data': serializer2.validated_data}, status=status.HTTP_201_CREATED)
             return Response({'message': '애플 회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
