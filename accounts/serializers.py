@@ -178,6 +178,11 @@ class LogInSerializer(serializers.Serializer):
         email = data.get("email")
         password = data.get("password")
 
+        try:
+            check_mail = VerifyEmail.objects.get(email=email)
+        except VerifyEmail.DoesNotExist:
+            raise serializers.ValidationError('이메일 인증이 완료되지 않았어요.')
+
         if not email:
             raise serializers.ValidationError('이메일을 입력해주세요.')
         if not password:
@@ -186,10 +191,10 @@ class LogInSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError('존재하지 않는 사용자입니다.')
+            raise serializers.ValidationError('회원정보가 없습니다. 회원가입을 먼저 진행해주세요.')
 
         if not user.check_password(password):
-            raise serializers.ValidationError('잘못된 비밀번호입니다.')
+            raise serializers.ValidationError('비밀번호를 확인해주세요.')
 
         return self.generate_tokens(user)
 
