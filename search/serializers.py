@@ -21,7 +21,7 @@ class SearchAllWriterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "nickname", "profile"]
+        fields = ["id", "nickname", "profile", "serviceID", "title_selection"]
 
 
 # Note 타입 - 메모
@@ -373,4 +373,12 @@ class SearchWritersSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "nickname", "username", "profile", "follow_status"]
+        fields = [
+            "id",
+            "nickname",
+            "username",
+            "profile",
+            "serviceID",
+            "title_selection",
+            "follow_status",
+        ]

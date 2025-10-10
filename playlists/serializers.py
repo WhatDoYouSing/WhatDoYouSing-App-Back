@@ -1,41 +1,62 @@
 from rest_framework import serializers
 from notes.models import *
 
+
 class PliReplySerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
+    is_liked = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PliReply
-        fields = ["id", "user", "created_at", "content", "likes_count", "mention"]
+        fields = [
+            "id",
+            "user",
+            "created_at",
+            "is_liked",
+            "content",
+            "likes_count",
+            "mention",
+        ]
 
     def get_user(self, obj):
         return {
             "id": obj.user.id,
             "username": obj.user.serviceID,
             "nickname": obj.user.nickname,
-            "profile": obj.user.profile
+            "profile": obj.user.profile,
         }
 
     def get_likes_count(self, obj):
         return obj.likes.count()
+
 
 class PliCommentSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
     replies = PliReplySerializer(many=True, read_only=True)  # 대댓글 포함
     likes_count = serializers.SerializerMethodField()
+    is_liked = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PliComment
-        fields = ["id", "user", "created_at", "content", "reply_count", "replies", "likes_count"]
+        fields = [
+            "id",
+            "user",
+            "is_liked",
+            "created_at",
+            "content",
+            "reply_count",
+            "replies",
+            "likes_count",
+        ]
 
     def get_user(self, obj):
         return {
             "id": obj.user.id,
             "username": obj.user.serviceID,
             "nickname": obj.user.nickname,
-            "profile": obj.user.profile
+            "profile": obj.user.profile,
         }
 
     def get_reply_count(self, obj):

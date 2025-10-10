@@ -50,7 +50,8 @@ class Notification(models.Model):
         ("emotion", "내 노트 감정"),
         ("comment", "댓글"),
         ("reply", "대댓글"),
-        ("like", "댓글 좋아요"),
+        ("like_comment", "댓글 좋아요"),
+        ("like_reply", "대댓글 좋아요"),
     ]
 
     user = models.ForeignKey(
@@ -109,6 +110,7 @@ class Activity(models.Model):
     obj_id = models.PositiveIntegerField(null=True)
     target = GenericForeignKey("ct", "obj_id")
     created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False, verbose_name="읽음 여부")
 
     class Meta:
         ordering = ["-created_at"]
