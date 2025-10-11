@@ -37,6 +37,7 @@ import string
 import os
 import time
 import jwt
+from jwt.algorithms import RSAAlgorithm
 
 BASE_URL = 'https://api.whatdoyousing.com/'
 
@@ -52,8 +53,31 @@ kakao_profile_uri = "https://kapi.kakao.com/v2/user/me"
 APPLE_BASE_URL = "https://appleid.apple.com"
 APPLE_AUTH_URL = "https://appleid.apple.com/auth/authorize"
 APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
+APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 
 # 일반/소셜 공통, 유저 관리 ############################################################################################
+
+# 📌 [애플] 보안 관련 토큰 설정
+def verify_apple_id_token(id_token, client_id):
+    res = requests.get(APPLE_KEYS_URL)
+    keys = res.json().get("keys", [])
+    client_id = settings.APPLE_CLIENT_ID
+    header = jwt.get_unverified_header(id_token)
+    kid = header.get("kid")
+    key = next((k for k in keys if k["kid"] == kid), None)
+    if not key:
+        raise ValueError("Apple public key not found")
+
+    public_key = RSAAlgorithm.from_jwk(key)
+    
+    decoded = jwt.decode(
+        id_token,
+        key=public_key,
+        algorithms=["RS256"],
+        audience=client_id,
+        issuer="https://appleid.apple.com"
+    )
+    return decoded
 
 # ✅ [공통] 토큰 리프레시
 class RefreshTokenView(views.APIView):
@@ -95,6 +119,76 @@ class RefreshTokenView(views.APIView):
             })
 
         return Response(resp, status=status.HTTP_200_OK)
+    
+# 📌 [공통] 소셜 토큰 리턴
+class SocialTokenView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        provider = request.data.get("provider")
+        access_token = request.data.get("access_token")
+        id_token = request.data.get("id_token")  # 구글/애플은 id_token도 가능
+
+        if not provider or not access_token:
+            return Response({"error": "provider와 access_token은 필수입니다."}, status=400)
+
+        user_info = None
+
+        if provider == "google":
+            res = requests.get("https://www.googleapis.com/oauth2/v2/userinfo",
+                               headers={"Authorization": f"Bearer {access_token}"})
+            if res.status_code != 200:
+                return Response({"error": "구글 토큰 검증 실패"}, status=400)
+            profile = res.json()
+            social_id = f"google_{profile['id']}"
+            email = profile.get("email")
+        
+        elif provider == "kakao":
+            res = requests.get("https://kapi.kakao.com/v2/user/me",
+                               headers={"Authorization": f"Bearer {access_token}"})
+            if res.status_code != 200:
+                return Response({"error": "카카오 토큰 검증 실패"}, status=400)
+            profile = res.json()
+            social_id = f"kakao_{profile['id']}"
+            email = profile.get("kakao_account", {}).get("email")
+
+        elif provider == "apple":
+            # ⚠️ 실제 운영에서는 애플 공개키 가져와 서명 검증 필수
+            # decoded = jwt.decode(id_token, options={"verify_signature": False})
+
+            # 📌 배포용 서명 검증
+            decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
+            sub = decoded.get("sub")
+            email = decoded.get("email")
+            social_id = f"apple_{sub}"
+
+        else:
+            return Response({"error": "지원하지 않는 provider입니다."}, status=400)
+
+        # --- User 조회/생성 ---
+        try:
+            user = User.objects.get(username=social_id)
+        except User.DoesNotExist:
+            user = User.objects.create(
+                username=social_id,
+                auth_provider=provider,
+                auth_provider_email=email,
+                is_active=True,
+            )
+
+        # --- JWT 발급 ---
+        token = RefreshToken.for_user(user)
+        resp = {
+            "id": user.id,
+            "username": user.username,
+            "nickname": user.nickname,
+            "profile": user.profile,
+            "access_token": str(token.access_token),
+            "access_token_exp": datetime.fromtimestamp(token.access_token['exp']),
+            "refresh_token": str(token),
+            "refresh_token_exp": datetime.fromtimestamp(token['exp']),
+        }
+        return Response(resp, status=200)
 
 # ✅ [공통] 랜덤 아이디 추천
 class RandomUsernameView(views.APIView):
@@ -245,47 +339,7 @@ class ConsentView(views.APIView):
             return Response({'message': '약관 동의 정보 확인 완료', 'data': serializer.validated_data}, status=200)
         return Response({'error': serializer.errors}, status=400)
 
-'''
 # ✅ [일반] 이메일 인증 요청
-class RequestEmailVerificationView(views.APIView):
-    def post(self, request):
-        email = request.data.get("email")
-        if not email:
-            return Response({"error": "이메일은 필수입니다."}, status=400)
-
-        # 이미 가입된 이메일 거부
-        if User.objects.filter(email=email).exists():
-            return Response({"error": "이미 가입된 이메일입니다."}, status=400)
-
-        # VerifyEmail 객체 생성 or 조회
-        verify_obj, created = VerifyEmail.objects.get_or_create(email=email)
-
-        # 토큰 생성
-        token = EmailVerificationTokenGenerator().make_token(email)
-        uid = urlsafe_base64_encode(force_bytes(email))
-
-        verification_link = request.build_absolute_uri(
-            reverse("verify_email", kwargs={"uidb64": uid, "token": token})
-        )
-
-        subject = "[왓두유씽] 이메일 주소 인증이 도착했어요!"
-        
-        html_content = render_to_string("email.html", {
-            "verification_link": verification_link,
-        })
-
-        email_message = EmailMultiAlternatives(
-            subject=subject,
-            body="HTML 지원되지 않는 클라이언트를 위한 텍스트 버전입니다.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[email],
-        )
-        email_message.attach_alternative(html_content, "text/html")
-        email_message.send()
-
-        return Response({"message": "인증 메일이 발송되었습니다."}, status=200)
-'''
-
 class RequestEmailVerificationView(views.APIView):
     def post(self, request):
         email = request.data.get("email")
@@ -319,9 +373,7 @@ class RequestEmailVerificationView(views.APIView):
 
         return Response({"message": "인증 코드가 이메일로 발송되었습니다."}, status=200)
 
-        
-
-# 📌 [일반] 이메일 인증 처리
+# ✅ [일반] 이메일 인증 처리
 class VerifyEmailView(views.APIView):
     def post(self, request):
         email = request.data.get("email")
@@ -651,7 +703,10 @@ class AppleCallbackView(views.APIView):
             return Response({'error': 'id_token missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         # ⚠️ 서명 검증 비활성화 (개발용)
-        decoded = jwt.decode(id_token, options={"verify_signature": False})
+        # decoded = jwt.decode(id_token, options={"verify_signature": False})
+
+        # 📌 서명 검증 활성화 (배포용)
+        decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
         sub = decoded.get("sub")
         email = decoded.get("email")
 
@@ -679,3 +734,4 @@ class AppleCallbackView(views.APIView):
                 if serializer2.is_valid():
                     return Response({'message': '애플 회원가입 성공', 'data': serializer2.validated_data}, status=status.HTTP_201_CREATED)
             return Response({'message': '애플 회원가입 실패', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        

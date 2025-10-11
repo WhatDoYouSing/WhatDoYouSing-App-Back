@@ -20,6 +20,7 @@ from .serializers import *
 from django.db.models import Count
 from moderation.mixins import BlockFilterMixin
 from moderation.models import *
+from django.utils import timezone
 from django.db.models import Exists, OuterRef, Count, Prefetch
 
 
@@ -167,7 +168,8 @@ class NoteDetailView(BlockFilterMixin, APIView):
             },
             "mine": is_mine,
             "is_collected": is_collected,
-            "created_at": note.created_at.strftime("%Y-%m-%d %H:%M"),
+            #"created_at": note.created_at.strftime("%Y-%m-%d %H:%M"),
+            "created_at": timezone.localtime(note.created_at).strftime("%Y-%m-%d %H:%M"),
             "is_updated": note.is_updated,
             "visibility": note.visibility,
             # "emotion": note.emotion.name,
