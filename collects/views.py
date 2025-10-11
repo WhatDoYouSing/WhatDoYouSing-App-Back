@@ -92,9 +92,14 @@ class ScrapListView(APIView):
             scrap_notes = ScrapNotes.objects.filter(scrap_list=scrap_list)
             scrap_playlists = ScrapPlaylists.objects.filter(scrap_list=scrap_list)
 
-            # 노트 제목과 가수 구성
-            note_count = scrap_notes.count()
-            pli_count = scrap_playlists.count()
+            note_ids = scrap_notes.values_list("content_id", flat=True)
+            pli_ids = scrap_playlists.values_list("content_id", flat=True)
+
+            notes = Notes.objects.filter(id__in=note_ids)
+            plis = Plis.objects.filter(id__in=pli_ids)
+
+            note_count = notes.count()
+            pli_count = plis.count()
 
             # subtitle 동적 생성 (노트 또는 플리가 0개일 경우 표시하지 않음)
             subtitle_parts = []
@@ -239,9 +244,14 @@ class ScrapListCheckView(APIView):
             scrap_notes = ScrapNotes.objects.filter(scrap_list=scrap_list)
             scrap_playlists = ScrapPlaylists.objects.filter(scrap_list=scrap_list)
 
-            # 노트 제목과 가수 구성
-            note_count = scrap_notes.count()
-            pli_count = scrap_playlists.count()
+            note_ids = scrap_notes.values_list("content_id", flat=True)
+            pli_ids = scrap_playlists.values_list("content_id", flat=True)
+
+            notes = Notes.objects.filter(id__in=note_ids)
+            plis = Plis.objects.filter(id__in=pli_ids)
+
+            note_count = notes.count()
+            pli_count = plis.count()
 
             # subtitle 동적 생성 (노트 또는 플리가 0개일 경우 표시하지 않음)
             subtitle_parts = []

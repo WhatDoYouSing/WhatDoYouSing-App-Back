@@ -59,6 +59,7 @@ class MyPliSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
     note_count = serializers.SerializerMethodField()
     pli_memo = serializers.SerializerMethodField()
+    album_art = serializers.SerializerMethodField()
 
     # 플리 안에 노트 몇개인지
     # 플리 내용
@@ -66,7 +67,7 @@ class MyPliSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plis
         fields = [
-            'type', 'id', 'title', 'note_count', 'pli_memo', 'user', 'serviceID', 'nickname', 'profile', 'created_at', 'is_updated', 'visibility', 
+            'type', 'id', 'title', 'album_art', 'note_count', 'pli_memo', 'user', 'serviceID', 'nickname', 'profile', 'created_at', 'is_updated', 'visibility', 
         ]
 
     def get_type(self,obj):
@@ -92,6 +93,17 @@ class MyPliSerializer(serializers.ModelSerializer):
             .first()
         )
         return memo
+    
+    def get_album_art(self, obj):
+        first_four_album_arts = PliNotes.objects.filter(plis=obj).values_list(
+            "notes__album_art", flat=True
+        )[:4]
+
+        # 앨범 아트 리스트가 비어 있지 않으면 반환, 없으면 None
+        if first_four_album_arts:
+            return list(first_four_album_arts)
+
+        return None
 
 # 📌 내 보관함 Serializer 
 #class MyCollectionSerializer(serializers.ModelSerializer):
