@@ -123,6 +123,8 @@ class ScrapListView(APIView):
                 "name": scrap_list.name,
                 "album_art": album_arts,  # 최대 4개의 앨범 아트를 저장할 리스트
                 "subtitle": subtitle,
+                "note_count":note_count,
+                "pli_count":pli_count
             }
 
             # 최종적으로 보관함 데이터를 리스트에 추가
@@ -285,6 +287,8 @@ class ScrapListCheckView(APIView):
                 "name": scrap_list.name,
                 "album_art": album_arts,  # 최대 4개의 앨범 아트를 저장할 리스트
                 "subtitle": subtitle,
+                "note_count":note_count,
+                "pli_count":pli_count,
                 "collect": is_collected,
             }
 
@@ -418,5 +422,28 @@ class ScrapListEditView(APIView):
                 "message": "보관함이 수정되었습니다.",
                 "data": {"id": scrap_list.id, "name": scrap_list.name},
             },
+            status=status.HTTP_200_OK,
+        )
+
+# 보관함 삭제 
+class ScrapListDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, content_id):
+        user = request.user
+        scrap_list = get_object_or_404(ScrapList, id=content_id)
+
+        # 본인 소유 여부 확인
+        if scrap_list.user != user:
+            return Response(
+                {"message": "본인의 보관함만 삭제할 수 있습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        name = scrap_list.name
+        scrap_list.delete() 
+
+        return Response(
+            {"message": f"보관함 '{name}' 및 그 안의 노트/플리가 삭제되었습니다."},
             status=status.HTTP_200_OK,
         )
