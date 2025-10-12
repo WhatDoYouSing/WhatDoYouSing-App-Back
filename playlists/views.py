@@ -137,10 +137,12 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
                         "nickname": comment.user.nickname,
                         "profile": comment.user.profile,
                     },
+                    "id": comment.id,
                     "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
                     "content": comment.content,
                     "reply_count": comment.replies.count(),
                     "likes_count": comment.likes.count(),
+                    "is_liked": comment.likes.filter(id=user.id).exists(),
                     "mine": comment.user == request.user,
                 }
             ]
@@ -358,9 +360,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                                 "nickname": reply.user.nickname,
                                 "profile": reply.user.profile,
                             },
-                            "is_liked": bool(
-                                getattr(comment, "is_liked", False)
-                            ),  # 추가
+                            "is_liked": comment.likes.filter(id=user.id).exists(),
                             "parent_nickname": comment.user.nickname,
                             "blocked": False,
                             "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
@@ -389,7 +389,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                             "nickname": comment.user.nickname,
                             "profile": comment.user.profile,
                         },
-                        "is_liked": bool(getattr(comment, "is_liked", False)),  # 추가
+                        "is_liked": comment.likes.filter(id=user.id).exists(),
                         "blocked": False,
                         "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
                         "content": comment.content,
