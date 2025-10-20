@@ -7,7 +7,7 @@ signals.py 가 앱 로딩 시 자동 등록되려면
 notifs/apps.py -> NotifsConfig.ready() 에서 `from . import signals` 호출이 있어야 합니다.
 """
 from django.apps import apps
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
@@ -206,12 +206,16 @@ def _push_and_record(*, target, actor, notif_type, message, obj):
 
 
 def _record_activity(user, act_type, obj):
-    Activity.objects.create(
-        user=user,
-        activity_type=act_type,
-        ct=ContentType.objects.get_for_model(obj),
-        obj_id=obj.pk,
-    )
+    try:
+        Activity.objects.create(
+            user=user,
+            activity_type=act_type,
+            ct=ContentType.objects.get_for_model(obj),
+            obj_id=obj.pk,
+        )
+    except Exception:
+        logger.exception("_record_activity 실패 for user=%s obj=%s", getattr(user, "id", None), getattr(obj, "pk", None))
+
 
 
 # ────────────────────────────────────────────────────────────────
@@ -237,6 +241,18 @@ def on_follow(sender, instance, created, **kw):
         obj=instance,
     )
     # 활동 탭엔 팔로우를 별도로 기록하지 않기로 함.
+
+# ===== 언팔로우 시 정리(선택: 팔로우 알림을 없애고 싶다면) =====
+@receiver(post_delete, sender=UserFollows)
+def on_unfollow(sender, instance, **kw):
+    try:
+        Notification.objects.filter(
+            user_id=getattr(instance, "following_id", None),
+            actor_id=getattr(instance, "follower_id", None),
+            notif_type="follow",
+        ).delete()
+    except Exception:
+        logger.exception("on_unfollow cleanup failed")
 
 
 # ────────────────────────────────────────────────────────────────
@@ -391,6 +407,41 @@ def on_pli_scrap(sender, instance, created, **kwargs):
         obj=pli_obj,
     )
 
+# ===== 스크랩 취소(삭제) 시 정리 =====
+@receiver(post_delete, sender=ScrapNotes)
+def on_note_unscrap(sender, instance, **kw):
+    try:
+        saver = getattr(getattr(instance, "scrap_list", None), "user", None)
+        note_id = getattr(instance, "content_id", None)
+        if not saver or not note_id:
+            return
+        owner_id = Note.objects.filter(pk=note_id).values_list("user_id", flat=True).first()
+        if not owner_id:
+            return
+        ct_note = ContentType.objects.get_for_model(Note)
+        Notification.objects.filter(
+            user_id=owner_id, actor_id=saver.id, notif_type="note_save", ct=ct_note, obj_id=note_id
+        ).delete()
+    except Exception:
+        logger.exception("on_note_unscrap failed")
+
+@receiver(post_delete, sender=ScrapPlaylists)
+def on_pli_unscrap(sender, instance, **kw):
+    try:
+        saver = getattr(getattr(instance, "scrap_list", None), "user", None)
+        pli_id = getattr(instance, "content_id", None)
+        if not saver or not pli_id:
+            return
+        owner_id = Pli.objects.filter(pk=pli_id).values_list("user_id", flat=True).first()
+        if not owner_id:
+            return
+        ct_pli = ContentType.objects.get_for_model(Pli)
+        Notification.objects.filter(
+            user_id=owner_id, actor_id=saver.id, notif_type="pli_save", ct=ct_pli, obj_id=pli_id
+        ).delete()
+    except Exception:
+        logger.exception("on_pli_unscrap failed")
+
 
 # ────────────────────────────────────────────────────────────────
 # 3. 노트 감정
@@ -421,6 +472,29 @@ def on_emotion(sender, instance, created, **kwargs):
     )
     _record_activity(user=actor, act_type="emotion", obj=instance)
 
+# ===== 감정 삭제 시 정리 =====
+@receiver(post_delete, sender=NoteEmotion)
+def on_note_emotion_deleted(sender, instance, **kw):
+    # 1) 권장 구조(알림이 NoteEmotion을 target)
+    ct_emotion = ContentType.objects.get_for_model(NoteEmotion)
+    Notification.objects.filter(ct=ct_emotion, obj_id=instance.pk, notif_type="emotion").delete()
+    Activity.objects.filter(ct=ct_emotion, obj_id=instance.pk, activity_type="emotion").delete()
+
+    # 2) fallback: 과거에 obj=note로 저장했을 수 있음 → 그 경우도 삭제
+    try:
+        from notes.models import Notes as Note
+        ct_note = ContentType.objects.get_for_model(Note)
+        note_id = getattr(getattr(instance, "note", None), "id", None)
+        if note_id:
+            Notification.objects.filter(
+                ct=ct_note,
+                obj_id=note_id,
+                notif_type="emotion",
+                actor_id=getattr(instance, "user_id", None),
+                user_id=getattr(getattr(instance, "note", None), "user_id", None),
+            ).delete()
+    except Exception:
+        logger.exception("on_note_emotion_deleted fallback failed")
 
 # ────────────────────────────────────────────────────────────────
 # 4. 댓글 / 대댓글
@@ -520,8 +594,8 @@ def on_note_comment(sender, instance, created, **kwargs):
                 actor=actor,
                 notif_type="comment",
                 message=f"{actor.nickname} 님이 댓글을 남겼어요.",
-                # obj=instance,  # 원글(노트)을 obj로 연결 -> 프론트에서 원글로 이동하기 편함
-                obj=note_obj,
+                obj=instance,  # 원글(노트)을 obj로 연결 -> 프론트에서 원글로 이동하기 편함
+                #obj=note_obj,
             )
 
     # 활동 기록은 항상 남김 (사용자 행위 이력)
@@ -550,8 +624,8 @@ def on_pli_comment(sender, instance, created, **kwargs):
                 actor=actor,
                 notif_type="comment",
                 message=f"{actor.nickname} 님이 댓글을 남겼어요.",
-                # obj=instance,
-                obj=pli_obj,
+                obj=instance,
+                #obj=pli_obj,
             )
 
     _record_activity(user=actor, act_type="comment_pli", obj=instance)
@@ -717,6 +791,54 @@ def on_pli_reply(sender, instance, created, **kwargs):
 
     _record_activity(user=actor, act_type="reply_pli", obj=instance)
 
+# ===== 댓글/대댓글 삭제 시 정리 =====
+@receiver(post_delete, sender=NoteComment)
+def on_note_comment_deleted(sender, instance, **kw):
+    ct_comment = ContentType.objects.get_for_model(NoteComment)
+    # 1) 행위객체 기준(권장 구조)
+    Notification.objects.filter(ct=ct_comment, obj_id=instance.pk, notif_type="comment").delete()
+    Activity.objects.filter(ct=ct_comment, obj_id=instance.pk, activity_type="comment_note").delete()
+    # 2) fallback: 예전에 obj=note로 저장된 알림 지우기
+    try:
+        from notes.models import Notes as Note
+        ct_note = ContentType.objects.get_for_model(Note)
+        note_id = getattr(getattr(instance, "note", None), "id", None)
+        if note_id:
+            Notification.objects.filter(
+                ct=ct_note, obj_id=note_id, notif_type="comment", actor_id=getattr(instance, "user_id", None)
+            ).delete()
+    except Exception:
+        logger.exception("on_note_comment_deleted fallback failed")
+
+@receiver(post_delete, sender=PliComment)
+def on_pli_comment_deleted(sender, instance, **kw):
+    ct_pli_comment = ContentType.objects.get_for_model(PliComment)
+    Notification.objects.filter(ct=ct_pli_comment, obj_id=instance.pk, notif_type="comment").delete()
+    Activity.objects.filter(ct=ct_pli_comment, obj_id=instance.pk, activity_type="comment_pli").delete()
+    # fallback: 예전에 obj=pli로 저장된 알림 지우기
+    try:
+        from notes.models import Plis as Pli
+        ct_pli = ContentType.objects.get_for_model(Pli)
+        pli_id = getattr(getattr(instance, "pli", None), "id", None)
+        if pli_id:
+            Notification.objects.filter(
+                ct=ct_pli, obj_id=pli_id, notif_type="comment", actor_id=getattr(instance, "user_id", None)
+            ).delete()
+    except Exception:
+        logger.exception("on_pli_comment_deleted fallback failed")
+
+@receiver(post_delete, sender=NoteReply)
+def on_note_reply_deleted(sender, instance, **kw):
+    ct_reply = ContentType.objects.get_for_model(NoteReply)
+    Notification.objects.filter(ct=ct_reply, obj_id=instance.pk, notif_type="reply").delete()
+    Activity.objects.filter(ct=ct_reply, obj_id=instance.pk, activity_type="reply_note").delete()
+
+@receiver(post_delete, sender=PliReply)
+def on_pli_reply_deleted(sender, instance, **kw):
+    ct_reply = ContentType.objects.get_for_model(PliReply)
+    Notification.objects.filter(ct=ct_reply, obj_id=instance.pk, notif_type="reply").delete()
+    Activity.objects.filter(ct=ct_reply, obj_id=instance.pk, activity_type="reply_pli").delete()
+
 
 # ────────────────────────────────────────────────────────────────
 # 5. 댓글/대댓글 좋아요
@@ -726,48 +848,95 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+""" def _handle_like(sender, instance, action, pk_set, **kwargs):
+ 
+    if action != "post_add":
+        owner = instance.user
+        is_reply = hasattr(instance, "comment")
+        for liker_id in pk_set:
+            if liker_id == owner.id:
+                continue
+            try:
+                liker = User.objects.get(pk=liker_id)
+            except User.DoesNotExist:
+                continue
+            if _is_blocked_by(owner, liker, obj=instance):
+                continue
+            notif_type = "like_reply" if is_reply else "like_comment"
+            message = (
+                f"{liker.nickname} 님이 내 대댓글에 좋아요를 남겼습니다."
+                if is_reply
+                else f"{liker.nickname} 님이 내 댓글에 좋아요를 남겼습니다."
+            )
+            _push_and_record(target=owner, actor=liker, notif_type=notif_type, message=message, obj=instance)
+            _record_activity(user=liker, act_type=notif_type, obj=instance) """
+
 def _handle_like(sender, instance, action, pk_set, **kwargs):
     """
-    instance : Comment / Reply 객체
-    pk_set   : { liker_id, ... }
+    instance : NoteComment | PliComment | NoteReply | PliReply
+    pk_set   : { liker_id, ... } (post_add/post_remove에서만 유효)
     """
-    if action != "post_add":
+    # Reply는 보통 .comment 속성이 있음
+    is_reply = hasattr(instance, "comment")
+    notif_type = "like_reply" if is_reply else "like_comment"
+
+    # pre_* 액션은 무시
+    if action not in ("post_add", "post_remove", "post_clear"):
         return
 
-    owner = instance.user  # 댓글/대댓글 작성자
-    is_reply = hasattr(instance, "comment")  # Reply 는 comment 속성 보유
+    if action == "post_add":
+        owner = getattr(instance, "user", None)
+        if not owner:
+            return
+        for liker_id in (pk_set or []):
+            if liker_id == getattr(owner, "id", None):
+                continue
+            try:
+                liker = User.objects.get(pk=liker_id)
+            except User.DoesNotExist:
+                continue
+            if _is_blocked_by(owner, liker, obj=instance):
+                continue
 
-    for liker_id in pk_set:
-        if liker_id == owner.id:
-            continue
+            message = (
+                f"{liker.nickname} 님이 내 대댓글에 좋아요를 남겼어요."
+                if is_reply else
+                f"{liker.nickname} 님이 내 댓글에 좋아요를 남겼어요."
+            )
+            _push_and_record(
+                target=owner,
+                actor=liker,
+                notif_type=notif_type,
+                message=message,
+                obj=instance,
+            )
+            _record_activity(user=liker, act_type=notif_type, obj=instance)
 
-        try:
-            liker = User.objects.get(pk=liker_id)
-        except User.DoesNotExist:
-            continue
+    elif action == "post_remove":
+        # 좋아요 취소 → 해당 알림/활동 삭제
+        ct = ContentType.objects.get_for_model(instance.__class__)
+        notif_candidates = ["like_reply", "like_comment", "like"]  # 구버전 호환
+        activity_candidates = ["like_reply", "like_comment", "like"]
+        for liker_id in (pk_set or []):
+            Notification.objects.filter(
+                actor_id=liker_id, ct=ct, obj_id=instance.pk,
+                notif_type__in=notif_candidates
+            ).delete()
+            Activity.objects.filter(
+                user_id=liker_id, ct=ct, obj_id=instance.pk,
+                activity_type__in=activity_candidates
+            ).delete()
 
-        if _is_blocked_by(owner, liker, obj=instance):
-            continue
-
-        # 분기: notif_type을 댓글/대댓글로 분리
-        notif_type = "like_reply" if is_reply else "like_comment"
-        message = (
-            f"{liker.nickname} 님이 내 대댓글에 좋아요를 남겼습니다."
-            if is_reply
-            else f"{liker.nickname} 님이 내 댓글에 좋아요를 남겼습니다."
-        )
-
-        _push_and_record(
-            target=owner,
-            actor=liker,
-            notif_type=notif_type,
-            message=message,
-            obj=instance,
-        )
-        # 활동 기록은 기존처럼 act_type에 따라 남김
-        _record_activity(user=liker, act_type=notif_type, obj=instance)
-
-
+    else:  # action == "post_clear"
+        # 인스턴스의 모든 like 정리
+        ct = ContentType.objects.get_for_model(instance.__class__)
+        Notification.objects.filter(
+            ct=ct, obj_id=instance.pk, notif_type__in=["like_reply","like_comment","like"]
+        ).delete()
+        Activity.objects.filter(
+            ct=ct, obj_id=instance.pk, activity_type__in=["like_reply","like_comment","like"]
+        ).delete()
+        
 # NoteComment.likes
 m2m_changed.connect(
     _handle_like,
