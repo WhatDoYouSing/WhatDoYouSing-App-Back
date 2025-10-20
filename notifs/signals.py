@@ -468,7 +468,8 @@ def on_emotion(sender, instance, created, **kwargs):
         actor=actor,
         notif_type="emotion",
         message=f"{actor.nickname} 님이 내 노트에 감정을 남겼어요.",
-        obj=note_obj,
+        #obj=note_obj,
+        obj=instance
     )
     _record_activity(user=actor, act_type="emotion", obj=instance)
 
