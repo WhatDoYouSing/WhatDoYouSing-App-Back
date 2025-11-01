@@ -80,15 +80,10 @@ class ScrapListView(APIView):
 
     def get(self, request):
         user = request.user
-
-        # 사용자 스크랩 리스트 조회
         scrap_lists = ScrapList.objects.filter(user=user)
-
-        # 반환할 데이터
         scrap_list_data = []
 
         for scrap_list in scrap_lists:
-            # 노트 스크랩 조회
             scrap_notes = ScrapNotes.objects.filter(scrap_list=scrap_list)
             scrap_playlists = ScrapPlaylists.objects.filter(scrap_list=scrap_list)
 
@@ -109,17 +104,28 @@ class ScrapListView(APIView):
                 subtitle_parts.append(f"플리 {pli_count}")
             subtitle = " · ".join(subtitle_parts) if subtitle_parts else None
 
-            # 최대 4개의 앨범 아트 가져오기
-            album_arts = []
-            note_ids = scrap_notes.values_list(
-                "content_id", flat=True
-            )  # content_id 가져오기
-            notes = Notes.objects.filter(id__in=note_ids)  # Notes에서 조회
+            # 앨범아트 노트 + 플리노트 순서대로 네개 가져오기 로직 ..
+            merged_items = list(scrap_notes) + list(scrap_playlists)
+            merged_items.sort(key=lambda x: x.created_at)
 
-            for note in notes:
-                if note.album_art:
-                    album_arts.append(note.album_art)
-                if len(album_arts) >= 4:  # 최대 4개까지만
+            album_arts = []
+            for item in merged_items:
+                if isinstance(item, ScrapNotes):
+                    note = Notes.objects.filter(id=item.content_id).first()
+                    if note and note.album_art:
+                        album_arts.append(note.album_art)
+
+                elif isinstance(item, ScrapPlaylists):
+                    pli = Plis.objects.filter(id=item.content_id).first()
+                    if pli:
+                        pli_notes = PliNotes.objects.filter(plis=pli).order_by("created_at")
+                        for pn in pli_notes:
+                            if pn.notes.album_art:
+                                album_arts.append(pn.notes.album_art)
+                            if len(album_arts) >= 4:
+                                break
+
+                if len(album_arts) >= 4:
                     break
 
             # 보관함 정보
@@ -261,17 +267,28 @@ class ScrapListCheckView(APIView):
                 subtitle_parts.append(f"플리 {pli_count}")
             subtitle = " · ".join(subtitle_parts) if subtitle_parts else None
 
-            # 최대 4개의 앨범 아트 가져오기
-            album_arts = []
-            note_ids = scrap_notes.values_list(
-                "content_id", flat=True
-            )  # content_id 가져오기
-            notes = Notes.objects.filter(id__in=note_ids)  # Notes에서 조회
+            # 앨범아트 노트 + 플리노트 순서대로 네개 가져오기 로직 ..
+            merged_items = list(scrap_notes) + list(scrap_playlists)
+            merged_items.sort(key=lambda x: x.created_at)
 
-            for note in notes:
-                if note.album_art:
-                    album_arts.append(note.album_art)
-                if len(album_arts) >= 4:  # 최대 4개까지만
+            album_arts = []
+            for item in merged_items:
+                if isinstance(item, ScrapNotes):
+                    note = Notes.objects.filter(id=item.content_id).first()
+                    if note and note.album_art:
+                        album_arts.append(note.album_art)
+
+                elif isinstance(item, ScrapPlaylists):
+                    pli = Plis.objects.filter(id=item.content_id).first()
+                    if pli:
+                        pli_notes = PliNotes.objects.filter(plis=pli).order_by("created_at")
+                        for pn in pli_notes:
+                            if pn.notes.album_art:
+                                album_arts.append(pn.notes.album_art)
+                            if len(album_arts) >= 4:
+                                break
+
+                if len(album_arts) >= 4:
                     break
 
             # collect 여부 확인
@@ -340,7 +357,7 @@ class ScrapListDetailView(APIView):
         album_arts = list(notes.values_list("album_art", flat=True)[:4])
 
         # 정보 (노트 개수 + 플리 개수)
-        info = []
+        info = [] 
         if notes.count():
             info.append(f"노트 {notes.count()}")
         if plis.count():

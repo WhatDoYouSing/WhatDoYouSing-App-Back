@@ -54,7 +54,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
             "comment_id", flat=True
         )
         blocked_reply_ids = NoteReplyBlock.objects.filter(blocker=user).values_list(
-            "reply_id", flat=True
+            "reply_id", flat=True 
         )
 
         comments = (
@@ -197,10 +197,12 @@ class NoteDetailView(BlockFilterMixin, APIView):
                         "nickname": c.user.nickname,
                         "profile": c.user.profile,
                     },
+                    "id": c.id,
                     "created_at": c.created_at.strftime("%Y-%m-%d %H:%M"),
                     "content": c.content,
                     "reply_count": c.replies.count(),
                     "likes_count": c.likes.count(),
+                    "is_liked": c.likes.filter(id=user.id).exists(),
                     "mine": c.user == user,
                 }
                 for c in comments[:1]  # 최근 1개만 반환
@@ -536,7 +538,8 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                                 "nickname": reply.user.nickname,
                                 "profile": reply.user.profile,
                             },
-                            "is_liked": bool(getattr(comment, "is_liked", False)),
+                            #"is_liked": bool(getattr(comment, "is_liked", False)),
+                            "is_liked": comment.likes.filter(id=user.id).exists(),
                             "parent_nickname": comment.user.nickname,  # 부모 댓글의 닉네임 (언급된 닉네임)
                             "blocked": False,
                             "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
@@ -566,7 +569,8 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                             "nickname": comment.user.nickname,
                             "profile": comment.user.profile,
                         },
-                        "is_liked": bool(getattr(comment, "is_liked", False)),
+                        #"is_liked": bool(getattr(comment, "is_liked", False)),
+                        "is_liked": comment.likes.filter(id=user.id).exists(),
                         "blocked": False,
                         "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
                         "content": comment.content,
