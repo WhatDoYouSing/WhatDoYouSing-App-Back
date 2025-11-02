@@ -169,7 +169,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
             },
             "mine": is_mine,
             "is_collected": is_collected,
-            "created_at": localtime(note.created_at).isoformat(),
+            "created_at": localtime(note.created_at).isoformat().strftime("%Y-%m-%d %H:%M"),
             "is_updated": note.is_updated,
             "visibility": note.visibility,
             # "emotion": note.emotion.name,
