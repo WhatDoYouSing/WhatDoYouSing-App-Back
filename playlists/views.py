@@ -13,7 +13,6 @@ from social.models import UserFollows
 from home.serializers import *
 from .serializers import *
 from django.utils import timezone
-from django.utils.timezone import localtime
 
 from moderation.mixins import BlockFilterMixin
 from moderation.models import *
@@ -171,7 +170,7 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
             },
             "mine": is_mine,
             "is_collected": is_collected,
-            "created_at": localtime(note.created_at).isoformat(),
+            "created_at": timezone.localtime(pli.created_at),
             "is_updated": pli.is_updated,
             "visibility": pli.visibility,
             "contents": note_data,
