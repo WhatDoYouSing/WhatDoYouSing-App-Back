@@ -57,7 +57,7 @@ APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 
 # 일반/소셜 공통, 유저 관리 ############################################################################################
 
-# 📌 [애플] 보안 관련 토큰 설정
+# ✅ [애플] 보안 관련 토큰 설정
 def verify_apple_id_token(id_token, client_id):
     res = requests.get(APPLE_KEYS_URL)
     keys = res.json().get("keys", [])
@@ -120,14 +120,14 @@ class RefreshTokenView(views.APIView):
 
         return Response(resp, status=status.HTTP_200_OK)
     
-# 📌 [공통] 소셜 토큰 리턴
+# ✅ [공통] 소셜 토큰 리턴
 class SocialTokenView(views.APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         provider = request.data.get("provider")
         access_token = request.data.get("access_token")
-        id_token = request.data.get("id_token")  # 구글/애플은 id_token도 가능
+        id_token = request.data.get("id_token")
 
         if not provider or not access_token:
             return Response({"error": "provider와 access_token은 필수입니다."}, status=400)
@@ -153,10 +153,6 @@ class SocialTokenView(views.APIView):
             email = profile.get("kakao_account", {}).get("email")
 
         elif provider == "apple":
-            # ⚠️ 실제 운영에서는 애플 공개키 가져와 서명 검증 필수
-            # decoded = jwt.decode(id_token, options={"verify_signature": False})
-
-            # 📌 배포용 서명 검증
             decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
             sub = decoded.get("sub")
             email = decoded.get("email")
@@ -165,7 +161,6 @@ class SocialTokenView(views.APIView):
         else:
             return Response({"error": "지원하지 않는 provider입니다."}, status=400)
 
-        # --- User 조회/생성 ---
         try:
             user = User.objects.get(username=social_id)
         except User.DoesNotExist:
@@ -176,7 +171,6 @@ class SocialTokenView(views.APIView):
                 is_active=True,
             )
 
-        # --- JWT 발급 ---
         token = RefreshToken.for_user(user)
         resp = {
             "id": user.id,
@@ -652,7 +646,7 @@ class AppleLoginView(views.APIView):
 
         return redirect(uri)
 
-# 📌 [Apple] 로그인 콜백 및 처리
+# ✅ [Apple] 로그인 콜백 및 처리
 class AppleCallbackView(views.APIView):
     permission_classes = [AllowAny]
 
@@ -702,10 +696,6 @@ class AppleCallbackView(views.APIView):
         if not id_token:
             return Response({'error': 'id_token missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ⚠️ 서명 검증 비활성화 (개발용)
-        # decoded = jwt.decode(id_token, options={"verify_signature": False})
-
-        # 📌 서명 검증 활성화 (배포용)
         decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
         sub = decoded.get("sub")
         email = decoded.get("email")
@@ -713,7 +703,6 @@ class AppleCallbackView(views.APIView):
         if not sub or not email:
             return Response({'error': 'Invalid id_token'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 로그인 or 회원가입
         social_type = 'apple'
         social_id = f"{social_type}_{sub}"
 
