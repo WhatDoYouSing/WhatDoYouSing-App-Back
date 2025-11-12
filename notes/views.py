@@ -199,7 +199,7 @@ class NoteDetailView(BlockFilterMixin, APIView):
                         "profile": c.user.profile,
                     },
                     "id": c.id,
-                    "created_at": c.created_at.strftime("%Y-%m-%d %H:%M"),
+                    "created_at": localtime(c.created_at).strftime("%Y-%m-%d %H:%M"),
                     "content": c.content,
                     "reply_count": c.replies.count(),
                     "likes_count": c.likes.count(),
@@ -526,7 +526,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                         {
                             "id": reply.id,
                             "blocked": True,
-                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                            "created_at": localtime(reply.created_at).strftime("%Y-%m-%d %H:%M"),
                         }
                     )
                 else:
@@ -543,7 +543,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                             "is_liked": comment.likes.filter(id=user.id).exists(),
                             "parent_nickname": comment.user.nickname,  # 부모 댓글의 닉네임 (언급된 닉네임)
                             "blocked": False,
-                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                            "created_at": localtime(reply.created_at).strftime("%Y-%m-%d %H:%M"),
                             "content": reply.content,
                             "likes_count": reply.likes.count(),
                             "mine": reply.user == user,  # 현재 유저가 작성한 경우 true
@@ -556,7 +556,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                     {
                         "id": comment.id,
                         "blocked": True,
-                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "created_at": localtime(comment.created_at).strftime("%Y-%m-%d %H:%M"),
                         "replies": serialized_replies,
                     }
                 )
@@ -573,7 +573,7 @@ class NoteCommentListView(BlockFilterMixin, APIView):
                         #"is_liked": bool(getattr(comment, "is_liked", False)),
                         "is_liked": comment.likes.filter(id=user.id).exists(),
                         "blocked": False,
-                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "created_at": localtime(comment.created_at).strftime("%Y-%m-%d %H:%M"),
                         "content": comment.content,
                         "reply_count": replies.count(),
                         "likes_count": comment.likes.count(),

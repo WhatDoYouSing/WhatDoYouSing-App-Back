@@ -138,7 +138,7 @@ class PlaylistDetailView(BlockFilterMixin, APIView):
                         "profile": comment.user.profile,
                     },
                     "id": comment.id,
-                    "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                    "created_at": timezone.localtime(comment.created_at).strftime("%Y-%m-%d %H:%M"),
                     "content": comment.content,
                     "reply_count": comment.replies.count(),
                     "likes_count": comment.likes.count(),
@@ -347,7 +347,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                         {
                             "id": reply.id,
                             "blocked": True,
-                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                            "created_at": timezone.localtime(reply.created_at).strftime("%Y-%m-%d %H:%M"),
                         }
                     )
                 else:
@@ -363,7 +363,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                             "is_liked": comment.likes.filter(id=user.id).exists(),
                             "parent_nickname": comment.user.nickname,
                             "blocked": False,
-                            "created_at": reply.created_at.strftime("%Y-%m-%d %H:%M"),
+                            "created_at": timezone.localtime(reply.created_at).strftime("%Y-%m-%d %H:%M"),
                             "content": reply.content,
                             "likes_count": reply.likes.count(),
                             "mine": reply.user == user,
@@ -375,7 +375,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                     {
                         "id": comment.id,
                         "blocked": True,
-                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "created_at": timezone.localtime(comment.created_at).strftime("%Y-%m-%d %H:%M"),
                         "replies": serialized_replies,
                     }
                 )
@@ -391,7 +391,7 @@ class PliCommentListView(BlockFilterMixin, APIView):
                         },
                         "is_liked": comment.likes.filter(id=user.id).exists(),
                         "blocked": False,
-                        "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "created_at": timezone.localtime(comment.created_at).strftime("%Y-%m-%d %H:%M"),
                         "content": comment.content,
                         "reply_count": replies.count(),
                         "likes_count": comment.likes.count(),

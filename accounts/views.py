@@ -132,8 +132,6 @@ class SocialTokenView(views.APIView):
         if not provider or not access_token:
             return Response({"error": "provider와 access_token은 필수입니다."}, status=400)
 
-        user_info = None
-
         if provider == "google":
             res = requests.get("https://www.googleapis.com/oauth2/v2/userinfo",
                                headers={"Authorization": f"Bearer {access_token}"})
@@ -163,6 +161,7 @@ class SocialTokenView(views.APIView):
 
         try:
             user = User.objects.get(username=social_id)
+            status = 'Joined'
         except User.DoesNotExist:
             user = User.objects.create(
                 username=social_id,
@@ -170,10 +169,12 @@ class SocialTokenView(views.APIView):
                 auth_provider_email=email,
                 is_active=True,
             )
+            status = 'New'
 
         token = RefreshToken.for_user(user)
         resp = {
             "id": user.id,
+            "status": status,
             "username": user.username,
             "nickname": user.nickname,
             "profile": user.profile,

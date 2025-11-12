@@ -15,7 +15,7 @@ _BAREUN = Tagger(
 )
 
 _ALLOWED_KO_POS = {"NNG", "NNP", "NP"}
-_ALLOWED_EN_POS = {"NN", "NNS", "NNP", "NNPS"} 
+_ALLOWED_EN_POS = {"NN", "NNS", "NNP", "NNPS", "PRP", "PRP$"} 
 
 def _normalize(s: str) -> str:
     return re.sub(r"[^A-Za-z가-힣0-9]", "", s).lower()
