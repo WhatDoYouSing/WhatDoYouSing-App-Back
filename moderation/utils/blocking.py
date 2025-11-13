@@ -1,26 +1,3 @@
-# from notes.models import Notes, Plis
-# from moderation.models import NoteBlock, PliBlock, UserBlock
-
-
-# def is_note_blocked(user, note: Notes) -> bool:
-#     """로그인 사용자 기준 note 또는 note 작성자가 차단됐는지"""
-#     if not user.is_authenticated:
-#         return False
-#     return (
-#         NoteBlock.objects.filter(blocker=user, note=note).exists()
-#         or UserBlock.objects.filter(blocker=user, blocked_user=note.user).exists()
-#     )
-
-
-# def is_pli_blocked(user, pli: Plis) -> bool:
-#     """로그인 사용자 기준 pli 또는 작성자가 차단됐는지"""
-#     if not user.is_authenticated:
-#         return False
-#     return (
-#         PliBlock.objects.filter(blocker=user, pli=pli).exists()
-#         or UserBlock.objects.filter(blocker=user, blocked_user=pli.user).exists()
-#     )
-
 from notes.models import Notes, Plis, NoteComment, NoteReply, PliComment, PliReply
 from moderation.models import (
     UserBlock,

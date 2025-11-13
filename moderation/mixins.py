@@ -18,10 +18,7 @@ class BlockFilterMixin:
         u = self.request.user
         if not u.is_authenticated or self.block_model is None:
             return qs
-
-        """ qs = qs.exclude(id__in=blocked_item_ids(u, self.block_model))
-        qs = qs.exclude(user_id__in=blocked_user_ids(u))
-        return qs """
+        
         # 게시글(Notes, Plis)은 user_id로 필터
         if self.block_model in [Notes, Plis]:
             qs = qs.exclude(id__in=blocked_item_ids(u, self.block_model))
