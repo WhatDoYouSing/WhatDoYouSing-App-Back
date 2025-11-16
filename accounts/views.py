@@ -161,10 +161,10 @@ class SocialTokenView(views.APIView):
 
         try:
             user = User.objects.get(username=social_id)
-            if user.serviceID:
-                status = 'Joined'
-            else:
+            if not user.required_consent:
                 status = 'New'
+            else:
+                status = 'Joined'
         except User.DoesNotExist:
             user = User.objects.create(
                 username=social_id,
