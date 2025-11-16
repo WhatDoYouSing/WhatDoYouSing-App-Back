@@ -161,7 +161,10 @@ class SocialTokenView(views.APIView):
 
         try:
             user = User.objects.get(username=social_id)
-            status = 'Joined'
+            if user.serviceID:
+                status = 'Joined'
+            else:
+                status = 'New'
         except User.DoesNotExist:
             user = User.objects.create(
                 username=social_id,
@@ -175,7 +178,7 @@ class SocialTokenView(views.APIView):
         resp = {
             "id": user.id,
             "status": status,
-            "username": user.username,
+            "serviceID": user.serviceID,
             "nickname": user.nickname,
             "profile": user.profile,
             "access_token": str(token.access_token),
