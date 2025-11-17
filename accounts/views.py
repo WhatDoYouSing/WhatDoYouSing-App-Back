@@ -38,6 +38,8 @@ import os
 import time
 import jwt
 from jwt.algorithms import RSAAlgorithm
+from google.oauth2 import id_token
+from google.auth.transport import requests as grequests
 
 BASE_URL = 'https://api.whatdoyousing.com/'
 
@@ -78,6 +80,18 @@ def verify_apple_id_token(id_token, client_id):
         issuer="https://appleid.apple.com"
     )
     return decoded
+
+#📌 [구글] 토큰 검증
+def verify_google_id_token(id_token_str, client_id):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            id_token_str,
+            grequests.Request(),
+            client_id
+        )
+        return idinfo
+    except Exception as e:
+        raise ValueError("구글 토큰 검증 실패: " + str(e))
 
 # ✅ [공통] 토큰 리프레시
 class RefreshTokenView(views.APIView):
@@ -129,10 +143,13 @@ class SocialTokenView(views.APIView):
         access_token = request.data.get("access_token")
         id_token = request.data.get("id_token")
 
-        if not provider or not access_token:
-            return Response({"error": "provider와 access_token은 필수입니다."}, status=400)
+        if not provider :
+            return Response({"error": "provider는 필수입니다."}, status=400)
 
         if provider == "google":
+            if not id_token:
+                return Response({"error": "id_token은 필수입니다."}, status=400)
+            """
             res = requests.get("https://www.googleapis.com/oauth2/v2/userinfo",
                                headers={"Authorization": f"Bearer {access_token}"})
             if res.status_code != 200:
@@ -140,8 +157,19 @@ class SocialTokenView(views.APIView):
             profile = res.json()
             social_id = f"google_{profile['id']}"
             email = profile.get("email")
-        
+            """
+            try:
+                decoded = verify_google_id_token(id_token, settings.GOOGLE_CLIENT_ID)
+            except:
+                return Response({"error": "구글 토큰 검증 실패"}, status=400)
+
+            sub = decoded["sub"]
+            email = decoded.get("email")
+            social_id = f"google_{sub}"
+                
         elif provider == "kakao":
+            if not access_token:
+                return Response({"error": "access_token은 필수입니다."}, status=400)
             res = requests.get("https://kapi.kakao.com/v2/user/me",
                                headers={"Authorization": f"Bearer {access_token}"})
             if res.status_code != 200:
@@ -151,6 +179,8 @@ class SocialTokenView(views.APIView):
             email = profile.get("kakao_account", {}).get("email")
 
         elif provider == "apple":
+            if not id_token:
+                return Response({"error": "id_token은 필수입니다."}, status=400)
             decoded = verify_apple_id_token(id_token, settings.APPLE_CLIENT_ID)
             sub = decoded.get("sub")
             email = decoded.get("email")

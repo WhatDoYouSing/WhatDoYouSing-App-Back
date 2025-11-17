@@ -22,3 +22,4 @@ dj-rest-auth
 bareunpy 
 #spacy>=3.7.2 
 nlpcloud
+google-auth
