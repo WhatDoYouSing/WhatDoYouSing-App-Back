@@ -20,4 +20,6 @@ requests
 dj-rest-auth
 # 바른 형태소 라이브러리 & 영어용
 bareunpy 
-spacy>=3.7.2  
+#spacy>=3.7.2 
+nlpcloud
+google-auth

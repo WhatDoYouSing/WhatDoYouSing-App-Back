@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --upgrade pip \
  && pip install --prefer-binary --no-cache-dir -r requirements.txt \
- && python -m spacy download en_core_web_sm \
+ # && python -m spacy download en_core_web_sm \
  && apt-get purge -y --auto-remove build-essential pkg-config \
  && rm -rf /root/.cache/pip
 

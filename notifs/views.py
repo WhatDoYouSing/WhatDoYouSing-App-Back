@@ -60,6 +60,9 @@ class NotificationListView(BlockFilterMixin, views.APIView):
                 for o in objs:
                     target_map[(ct_id, o.id)] = o
 
+        # QA 11번 해결을 위해 임의로 추가해본 라인입니다. 이외에 건드린 것 없고 수정 시 지워주셔도 무방합니다.
+        qs = [n for n in list(qs) if (n.ct_id, n.obj_id) in target_map]                  
+
         serializer = NotificationSerializer(
             qs, many=True, context={"target_map": target_map}
         )
@@ -132,6 +135,9 @@ class ActivityListView(BlockFilterMixin, views.APIView):
             # owner가 없거나 owner가 차단 목록에 없으면 포함
             if not owner or owner.id not in blocked_users:
                 filtered_acts.append(act)
+
+        # QA 11번 해결을 위해 임의로 추가해본 라인입니다. 이외에 건드린 것 없고 수정 시 지워주셔도 무방합니다.
+        qs = [n for n in list(qs) if (n.ct_id, n.obj_id) in target_map]                  
 
         # 4) serializer에 target_map 전달 (성능 최적화)
         serializer = ActivitySerializer(

@@ -13,15 +13,13 @@ from notes.models import Notes, Plis
 
 
 class IsNotBlocked(BasePermission):
-    """상세 뷰 접근 시 차단 대상이면 404"""
-
     message = "Not found."
 
     def has_object_permission(
         self,
         request,
         view,
-        obj: Any,  # Notes · Plis · 기타 모델
+        obj: Any,
     ) -> bool:
         user = request.user
         if not user.is_authenticated:
