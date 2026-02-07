@@ -9,6 +9,7 @@ from rest_framework import views
 from rest_framework.status import *
 from rest_framework.response import Response
 from django.db.models import Q, Count
+from django.db import close_old_connections
 from django.conf import settings
 
 import requests
@@ -462,6 +463,8 @@ class SpotifyAcessTokenView(views.APIView):
         return Response({"message": "Spotify AccessToken 조회 성공", "data": {"access_token":access_token}}, status=status.HTTP_200_OK)
 
 def update_spotify():
+    close_old_connections()
+
     auth_url = 'https://accounts.spotify.com/api/token'
     headers = {
         'content-type': 'application/x-www-form-urlencoded',
@@ -473,7 +476,15 @@ def update_spotify():
         'client_id': settings.SPOTIFY_CLIENT_ID,
     }
     auth_response = requests.post(auth_url, headers=headers,data=data)
+
+    if auth_response.status_code != 200:
+        print("Spotify token refresh failed:", auth_response.text)
+        return
+
     access_token = auth_response.json().get('access_token')
+    if not access_token:
+        print("Spotify access_token missing:", auth_response.json())
+        return
 
     if Spotify.objects.exists():
         token = Spotify.objects.get(id=1)
